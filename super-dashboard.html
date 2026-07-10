@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FBBMS | Super Manager</title>
+
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/variables.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/login.css">
+</head>
+<body data-role="super">
+
+<header class="fb-topbar">
+  <div class="fb-brand">
+    <img src="assets/logo.svg" alt="logo">
+    <div class="fb-brand-text">
+      <div class="fb-brand-name">Four Brothers</div>
+      <div class="fb-brand-tag">Executive Overview</div>
+    </div>
+  </div>
+
+  <div class="fb-clock-host" id="clockHost"></div>
+
+  <div class="fb-profile">
+    <button class="fb-profile-trigger" id="profileTrigger">
+      <span class="fb-avatar">MS</span>
+      <span class="fb-profile-name d-none d-sm-inline mono">manager@fourbrothers.online</span>
+      <i class="bi bi-chevron-down text-faint-fb" style="font-size:0.75rem;"></i>
+    </button>
+    <div class="fb-dropdown" id="profileDropdown">
+      <button class="fb-dropdown-item" id="editProfileBtn"><i class="bi bi-person-gear"></i> Edit Profile</button>
+      <div class="fb-dropdown-divider"></div>
+      <button class="fb-dropdown-item danger" id="logoutBtn"><i class="bi bi-box-arrow-right"></i> Logout</button>
+    </div>
+  </div>
+</header>
+
+<main class="fb-page-wrap">
+
+  <h1 class="fb-page-heading mb-1"><span class="accent-dot"></span> Super Manager Console</h1>
+  <p class="text-muted-fb mb-4">Complete oversight of Sports and Scents divisions, staff, and performance analytics.</p>
+
+  <div class="fb-nav-pill mb-4" id="mainNav">
+    <button class="active" data-section="sports"><i class="bi bi-dribbble"></i> Sports</button>
+    <button data-section="scents"><i class="bi bi-flower2"></i> Scents</button>
+    <button data-section="staffs"><i class="bi bi-people"></i> Staffs</button>
+  </div>
+
+  <!-- ============ SPORTS SECTION ============ -->
+  <section class="fb-section active" id="division-sports" data-kind="sports">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+      <div class="fb-tabs division-tabs">
+        <button class="fb-tab active" data-sub="today">Today</button>
+        <button class="fb-tab" data-sub="weekly">Weekly</button>
+        <button class="fb-tab" data-sub="monthly">Monthly</button>
+        <button class="fb-tab" data-sub="yearly">Yearly</button>
+        <button class="fb-tab" data-sub="graph"><i class="bi bi-graph-up"></i> Graphical Representation</button>
+      </div>
+    </div>
+
+    <!-- Today -->
+    <div class="sub-section" data-sub-section="today">
+      <div class="fb-card mb-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div>
+          <div class="fb-stat-label mb-1">Today's Total &mdash; <span class="today-label mono"></span></div>
+          <div class="fb-stat-value today-total" style="font-size:2rem;"></div>
+        </div>
+        <div class="fb-badge fb-badge-category today-count"></div>
+      </div>
+      <div class="fb-table-wrap fb-scroll-x">
+        <table class="fb-table today-table">
+          <thead><tr><th>Time Logged</th><th>Customer</th><th>Item</th><th>Category</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Weekly -->
+    <div class="sub-section" data-sub-section="weekly" style="display:none;">
+      <div class="fb-day-grid weekly-day-grid"></div>
+      <div class="fb-card mb-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div>
+          <div class="fb-stat-label mb-1 weekly-detail-label">Total</div>
+          <div class="fb-stat-value weekly-detail-total" style="font-size:2rem;"></div>
+        </div>
+        <div class="fb-badge fb-badge-category weekly-detail-count"></div>
+      </div>
+      <div class="fb-table-wrap fb-scroll-x">
+        <table class="fb-table weekly-table">
+          <thead><tr><th>Date</th><th>Customer</th><th>Item</th><th>Category</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Monthly -->
+    <div class="sub-section" data-sub-section="monthly" style="display:none;">
+      <div class="fb-month-grid monthly-grid"></div>
+      <div class="fb-card mb-4 d-flex flex-wrap align-items-center justify-content-between gap-3 monthly-detail-card" style="display:none;">
+        <div>
+          <div class="fb-stat-label mb-1">Total income &mdash; <span class="monthly-detail-label"></span></div>
+          <div class="fb-stat-value monthly-detail-total" style="font-size:2rem;"></div>
+        </div>
+        <div class="fb-badge fb-badge-category monthly-detail-count"></div>
+      </div>
+      <div class="fb-table-wrap fb-scroll-x">
+        <table class="fb-table monthly-table">
+          <thead><tr><th>Date</th><th>Customer</th><th>Item</th><th>Category</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Yearly -->
+    <div class="sub-section" data-sub-section="yearly" style="display:none;">
+      <div class="fb-day-grid yearly-year-grid" style="grid-template-columns:repeat(auto-fill, minmax(110px,1fr));"></div>
+      <div class="fb-card mb-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div>
+          <div class="fb-stat-label mb-1 yearly-detail-label">Grand Total</div>
+          <div class="fb-stat-value yearly-detail-total" style="font-size:2rem;"></div>
+        </div>
+      </div>
+      <div class="fb-table-wrap fb-scroll-x">
+        <table class="fb-table yearly-table">
+          <thead><tr><th>Month</th><th>Records</th><th>Total Income</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Graph -->
+    <div class="sub-section" data-sub-section="graph" style="display:none;">
+      <div class="fb-toolbar">
+        <select class="fb-select graph-select">
+          <option value="Total">Total (Weekly Overview)</option>
+          <option value="Monday">Monday trend</option>
+          <option value="Tuesday">Tuesday trend</option>
+          <option value="Wednesday">Wednesday trend</option>
+          <option value="Thursday">Thursday trend</option>
+          <option value="Friday">Friday trend</option>
+          <option value="Saturday">Saturday trend</option>
+          <option value="Sunday">Sunday trend</option>
+        </select>
+      </div>
+      <div class="fb-chart-card">
+        <div class="fb-chart-canvas-wrap"><canvas class="graph-canvas"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCENTS SECTION (mirrors sports) ============ -->
+  <section class="fb-section" id="division-scents" data-kind="scents">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+      <div class="fb-tabs division-tabs">
+        <button class="fb-tab active" data-sub="today">Today</button>
+        <button class="fb-tab" data-sub="weekly">Weekly</button>
+        <button class="fb-tab" data-sub="monthly">Monthly</button>
+        <button class="fb-tab" data-sub="yearly">Yearly</button>
+        <button class="fb-tab" data-sub="graph"><i class="bi bi-graph-up"></i> Graphical Representation</button>
+      </div>
+    </div>
+
+    <div class="sub-section" data-sub-section="today">
+      <div class="fb-card mb-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div>
+          <div class="fb-stat-label mb-1">Today's Total &mdash; <span class="today-label mono"></span></div>
+          <div class="fb-stat-value today-total" style="font-size:2rem;"></div>
+        </div>
+        <div class="fb-badge fb-badge-category today-count"></div>
+      </div>
+      <div class="fb-table-wrap fb-scroll-x">
+        <table class="fb-table today-table">
+          <thead><tr><th>Time Logged</th><th>Customer</th><th>Item</th><th>Category</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sub-section" data-sub-section="weekly" style="display:none;">
+      <div class="fb-day-grid weekly-day-grid"></div>
+      <div class="fb-card mb-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div>
+          <div class="fb-stat-label mb-1 weekly-detail-label">Total</div>
+          <div class="fb-stat-value weekly-detail-total" style="font-size:2rem;"></div>
+        </div>
+        <div class="fb-badge fb-badge-category weekly-detail-count"></div>
+      </div>
+      <div class="fb-table-wrap fb-scroll-x">
+        <table class="fb-table weekly-table">
+          <thead><tr><th>Date</th><th>Customer</th><th>Item</th><th>Category</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sub-section" data-sub-section="monthly" style="display:none;">
+      <div class="fb-month-grid monthly-grid"></div>
+      <div class="fb-card mb-4 d-flex flex-wrap align-items-center justify-content-between gap-3 monthly-detail-card" style="display:none;">
+        <div>
+          <div class="fb-stat-label mb-1">Total income &mdash; <span class="monthly-detail-label"></span></div>
+          <div class="fb-stat-value monthly-detail-total" style="font-size:2rem;"></div>
+        </div>
+        <div class="fb-badge fb-badge-category monthly-detail-count"></div>
+      </div>
+      <div class="fb-table-wrap fb-scroll-x">
+        <table class="fb-table monthly-table">
+          <thead><tr><th>Date</th><th>Customer</th><th>Item</th><th>Category</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sub-section" data-sub-section="yearly" style="display:none;">
+      <div class="fb-day-grid yearly-year-grid" style="grid-template-columns:repeat(auto-fill, minmax(110px,1fr));"></div>
+      <div class="fb-card mb-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div>
+          <div class="fb-stat-label mb-1 yearly-detail-label">Grand Total</div>
+          <div class="fb-stat-value yearly-detail-total" style="font-size:2rem;"></div>
+        </div>
+      </div>
+      <div class="fb-table-wrap fb-scroll-x">
+        <table class="fb-table yearly-table">
+          <thead><tr><th>Month</th><th>Records</th><th>Total Income</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sub-section" data-sub-section="graph" style="display:none;">
+      <div class="fb-toolbar">
+        <select class="fb-select graph-select">
+          <option value="Total">Total (Weekly Overview)</option>
+          <option value="Monday">Monday trend</option>
+          <option value="Tuesday">Tuesday trend</option>
+          <option value="Wednesday">Wednesday trend</option>
+          <option value="Thursday">Thursday trend</option>
+          <option value="Friday">Friday trend</option>
+          <option value="Saturday">Saturday trend</option>
+          <option value="Sunday">Sunday trend</option>
+        </select>
+      </div>
+      <div class="fb-chart-card">
+        <div class="fb-chart-canvas-wrap"><canvas class="graph-canvas"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ STAFFS SECTION ============ -->
+  <section class="fb-section" id="section-staffs">
+    <div class="row g-3" id="staffCardsRow"></div>
+  </section>
+
+</main>
+
+<!-- EDIT PROFILE MODAL -->
+<div class="modal fade" id="editProfileModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content fb-modal">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-person-gear"></i> Edit Profile</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+
+        <div id="profileStepForm">
+          <label class="fb-form-label">Username (email)</label>
+          <input type="text" class="fb-form-control mono mb-3" value="manager@fourbrothers.online" disabled>
+
+          <label class="fb-form-label">New password</label>
+          <input type="password" class="fb-form-control mb-3" id="newPasswordInput" placeholder="Enter new password">
+
+          <label class="fb-form-label">Confirm new password</label>
+          <input type="password" class="fb-form-control mb-2" id="confirmPasswordInput" placeholder="Re-enter new password">
+
+          <div class="auth-error" id="profileFormError" style="margin-top:12px;">
+            <i class="bi bi-exclamation-circle"></i><span id="profileFormErrorText"></span>
+          </div>
+        </div>
+
+        <div id="profileStepOtp" style="display:none;">
+          <div class="otp-envelope"><i class="bi bi-shield-lock"></i></div>
+          <p class="auth-subtitle" style="margin-bottom:14px;">Enter the 6-digit code sent to <b class="mono">manager@fourbrothers.online</b></p>
+          <div class="auth-error" id="profileOtpError"><i class="bi bi-exclamation-circle"></i><span id="profileOtpErrorText"></span></div>
+          <div class="otp-inputs" id="profileOtpInputs">
+            <input type="text" inputmode="numeric" maxlength="1"><input type="text" inputmode="numeric" maxlength="1">
+            <input type="text" inputmode="numeric" maxlength="1"><input type="text" inputmode="numeric" maxlength="1">
+            <input type="text" inputmode="numeric" maxlength="1"><input type="text" inputmode="numeric" maxlength="1">
+          </div>
+          <div class="demo-creds">
+            <i class="bi bi-info-circle"></i> Demo mode &mdash; live code: <span class="mono" id="profileDemoCode" style="color:var(--sports); font-weight:700;">------</span>
+          </div>
+        </div>
+
+        <div id="profileStepSuccess" style="display:none;" class="otp-success">
+          <div class="check-ring"><i class="bi bi-check-lg"></i></div>
+          <p class="auth-subtitle">Password changed successfully.</p>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="fb-btn-outline" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="fb-btn-primary" id="profileSendOtpBtn">Send verification code</button>
+        <button type="button" class="fb-btn-primary" id="profileVerifyOtpBtn" style="display:none;">Verify &amp; Change Password</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STAFF EDIT MODAL -->
+<div class="modal fade" id="staffEditModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content fb-modal">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-person-lines-fill"></i> Edit Staff Account</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+
+        <div id="staffStepForm">
+          <label class="fb-form-label">Email</label>
+          <input type="email" class="fb-form-control mb-3" id="staffEditEmail">
+          <label class="fb-form-label">New password <span class="text-faint-fb">(leave blank to keep current)</span></label>
+          <input type="password" class="fb-form-control mb-2" id="staffEditPassword" placeholder="New password">
+          <div class="auth-error" id="staffFormError"><i class="bi bi-exclamation-circle"></i><span id="staffFormErrorText"></span></div>
+        </div>
+
+        <div id="staffStepOtp" style="display:none;">
+          <div class="otp-envelope"><i class="bi bi-shield-lock"></i></div>
+          <p class="auth-subtitle" style="margin-bottom:14px;">Enter the 6-digit code sent to <b class="mono">manager@fourbrothers.online</b> to confirm this change</p>
+          <div class="auth-error" id="staffOtpError"><i class="bi bi-exclamation-circle"></i><span id="staffOtpErrorText"></span></div>
+          <div class="otp-inputs" id="staffOtpInputs">
+            <input type="text" inputmode="numeric" maxlength="1"><input type="text" inputmode="numeric" maxlength="1">
+            <input type="text" inputmode="numeric" maxlength="1"><input type="text" inputmode="numeric" maxlength="1">
+            <input type="text" inputmode="numeric" maxlength="1"><input type="text" inputmode="numeric" maxlength="1">
+          </div>
+          <div class="demo-creds">
+            <i class="bi bi-info-circle"></i> Demo mode &mdash; live code: <span class="mono" id="staffDemoCode" style="color:var(--sports); font-weight:700;">------</span>
+          </div>
+        </div>
+
+        <div id="staffStepSuccess" style="display:none;" class="otp-success">
+          <div class="check-ring"><i class="bi bi-check-lg"></i></div>
+          <p class="auth-subtitle">Staff account updated successfully.</p>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="fb-btn-outline" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="fb-btn-primary" id="staffSendOtpBtn">Send verification code</button>
+        <button type="button" class="fb-btn-primary" id="staffVerifyOtpBtn" style="display:none;">Verify &amp; Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/data.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/super.js"></script>
+</body>
+</html>

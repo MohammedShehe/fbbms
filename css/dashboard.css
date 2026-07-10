@@ -1,0 +1,133 @@
+/* ============================================================
+   FBBMS DASHBOARD LAYOUT
+   ============================================================ */
+
+body[data-role="sports"]{ --accent:var(--sports); --accent-dim:var(--sports-dim); --accent-glow:var(--sports-glow); }
+body[data-role="scents"]{ --accent:var(--scents); --accent-dim:var(--scents-dim); --accent-glow:var(--scents-glow); }
+body[data-role="super"]{ --accent:var(--super); --accent-dim:var(--super-dim); --accent-glow:var(--super-glow); }
+
+.accent-dot{ background:var(--accent); color:var(--accent); }
+.fb-fab, .fb-btn-primary{ background:linear-gradient(90deg, var(--accent), var(--super)); }
+.fb-tab.active{ background:linear-gradient(90deg, var(--accent), var(--super)); }
+.fb-clock-time{ background:linear-gradient(90deg, var(--accent), var(--super)); -webkit-background-clip:text; background-clip:text; }
+.fb-avatar{ background:linear-gradient(135deg, var(--accent), var(--super)); }
+
+.fb-stat-card:nth-of-type(1){ --accent-glow: var(--accent-glow); animation-delay:0s; }
+.fb-stat-card:nth-of-type(2){ animation-delay:0.06s; }
+.fb-stat-card:nth-of-type(3){ animation-delay:0.12s; }
+.fb-stat-card:nth-of-type(4){ animation-delay:0.18s; }
+
+.fb-stats-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+  gap:16px;
+  margin-bottom:8px;
+}
+
+.fb-badge-category{
+  background:rgba(124,111,240,0.12);
+  border-color:rgba(124,111,240,0.3);
+  color:#B7B0FA;
+}
+.fb-badge-total{
+  background:var(--accent-glow);
+  border-color:var(--accent);
+  color:var(--accent);
+}
+
+/* Month accordion / grid for Monthly view */
+.fb-month-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));
+  gap:12px;
+  margin-bottom:22px;
+}
+.fb-month-chip{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:var(--radius-md);
+  padding:14px 16px;
+  cursor:pointer;
+  transition:all 0.2s var(--ease-out);
+}
+.fb-month-chip:hover{ border-color:var(--accent); transform:translateY(-2px); }
+.fb-month-chip.active{
+  border-color:var(--accent);
+  background:linear-gradient(160deg, var(--raised-2), var(--panel));
+  box-shadow:0 8px 22px -10px var(--accent-glow);
+}
+.fb-month-chip .m-name{ font-weight:700; font-size:0.92rem; }
+.fb-month-chip .m-count{ font-size:0.72rem; color:var(--text-faint); margin-top:2px; }
+.fb-month-chip .m-total{ font-family:var(--font-data); font-size:0.8rem; color:var(--accent); margin-top:6px; font-weight:700; }
+
+/* Weekday grid for super manager weekly view */
+.fb-day-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(120px, 1fr));
+  gap:10px;
+  margin-bottom:20px;
+}
+.fb-day-chip{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:var(--radius-md);
+  padding:12px 14px;
+  text-align:center;
+  cursor:pointer;
+  transition:all 0.2s var(--ease-out);
+}
+.fb-day-chip:hover{ border-color:var(--super); transform:translateY(-2px); }
+.fb-day-chip.active{
+  border-color:var(--super);
+  background:linear-gradient(160deg, var(--raised-2), var(--panel));
+}
+.fb-day-chip .d-name{ font-size:0.78rem; color:var(--text-muted); }
+.fb-day-chip .d-date{ font-size:0.68rem; color:var(--text-faint); margin-top:2px; }
+.fb-day-chip .d-total{ font-family:var(--font-data); font-weight:700; font-size:0.85rem; margin-top:6px; color:var(--super); }
+
+/* Chart card */
+.fb-chart-card{
+  background:linear-gradient(180deg, var(--raised), var(--panel));
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  padding:24px;
+}
+.fb-chart-canvas-wrap{
+  position:relative;
+  height:360px;
+}
+
+/* Top nav pill menu (Sports / Scents / Staffs, section switcher) */
+.fb-nav-pill{
+  display:inline-flex; gap:6px;
+  background:var(--panel); border:1px solid var(--border);
+  border-radius:var(--radius-pill); padding:5px;
+}
+.fb-nav-pill button{
+  border:none; background:none;
+  padding:9px 22px; border-radius:var(--radius-pill);
+  color:var(--text-muted); font-weight:600; font-size:0.88rem;
+  cursor:pointer; transition:all 0.25s var(--ease-out);
+}
+.fb-nav-pill button.active{
+  color:#06090F;
+  background:linear-gradient(90deg, var(--sports), var(--super) 55%, var(--scents));
+}
+
+.fb-section{ display:none; animation:fadeUp 0.4s var(--ease-out) both; }
+.fb-section.active{ display:block; }
+
+.fb-staff-card{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  padding:20px;
+  display:flex;
+  align-items:center;
+  gap:16px;
+}
+.fb-staff-card .fb-avatar{ width:48px; height:48px; font-size:1rem; }
+
+@media (max-width: 576px){
+  .fb-chart-canvas-wrap{ height:280px; }
+}
