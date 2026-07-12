@@ -9,6 +9,8 @@ const FB_KEYS = {
   STAFF: "fbbms_staff",
   RECORDS_SPORTS: "fbbms_records_sports",
   RECORDS_SCENTS: "fbbms_records_scents",
+  INVENTORY_SPORTS: "fbbms_inventory_sports",
+  INVENTORY_SCENTS: "fbbms_inventory_scents",
   SESSION: "fbbms_session",
   OTP: "fbbms_otp"
 };
@@ -31,6 +33,12 @@ function fbInitDatabase(){
   }
   if(!localStorage.getItem(FB_KEYS.RECORDS_SCENTS)){
     localStorage.setItem(FB_KEYS.RECORDS_SCENTS, JSON.stringify(fbSeedRecords("scents")));
+  }
+  if(!localStorage.getItem(FB_KEYS.INVENTORY_SPORTS)){
+    localStorage.setItem(FB_KEYS.INVENTORY_SPORTS, JSON.stringify(fbSeedInventory("sports")));
+  }
+  if(!localStorage.getItem(FB_KEYS.INVENTORY_SCENTS)){
+    localStorage.setItem(FB_KEYS.INVENTORY_SCENTS, JSON.stringify(fbSeedInventory("scents")));
   }
 }
 
@@ -58,6 +66,20 @@ function fbSeedRecords(kind){
   return out.sort((a,b)=> new Date(b.date) - new Date(a.date));
 }
 
+/* ---------------- Inventory seed ---------------- */
+function fbSeedInventory(kind){
+  const inv = {};
+  FB_CATEGORIES[kind].forEach(c=>{
+    if(c === "Other"){ inv[c] = { amount:0, unit:"units" }; return; }
+    let unit = "pieces";
+    if(/footwear|shoes/i.test(c)) unit = "pairs";
+    else if(/jersey|apparel/i.test(c)) unit = "pieces";
+    else if(/perfume|spray|deodorant|freshener|oud/i.test(c)) unit = "bottles";
+    inv[c] = { amount: Math.floor(Math.random()*30)+15, unit };
+  });
+  return inv;
+}
+
 /* ---------------- Staff ---------------- */
 function fbGetStaff(){ return JSON.parse(localStorage.getItem(FB_KEYS.STAFF)); }
 function fbSaveStaff(staff){ localStorage.setItem(FB_KEYS.STAFF, JSON.stringify(staff)); }
@@ -81,10 +103,75 @@ function fbAddRecord(kind, record){
   record.total = Number(record.quantity) * Number(record.unitPrice);
   records.unshift(record);
   fbSaveRecords(kind, records);
+  // Sales automatically deduct stock from the matching inventory category
+  fbDeductInventory(kind, record.category, Number(record.quantity) || 0);
   return record;
 }
 function fbDeleteRecord(kind, id){
-  fbSaveRecords(kind, fbGetRecords(kind).filter(r=> r.id !== id));
+  const records = fbGetRecords(kind);
+  const target = records.find(r=> r.id === id);
+  fbSaveRecords(kind, records.filter(r=> r.id !== id));
+  // Deleting a sale record restores the stock that was deducted for it
+  if(target){
+    fbAddInventoryStock(kind, target.category, `${target.quantity} ${fbGetInventory(kind)[target.category]?.unit || "units"}`.trim());
+  }
+}
+
+/* ---------------- Inventory ---------------- */
+function fbGetInventory(kind){
+  const key = kind === "sports" ? FB_KEYS.INVENTORY_SPORTS : FB_KEYS.INVENTORY_SCENTS;
+  return JSON.parse(localStorage.getItem(key)) || {};
+}
+function fbSaveInventory(kind, inv){
+  const key = kind === "sports" ? FB_KEYS.INVENTORY_SPORTS : FB_KEYS.INVENTORY_SCENTS;
+  localStorage.setItem(key, JSON.stringify(inv));
+}
+
+/* Parses free text like "10 pairs", "25", "3 bottles" into { amount, unit } */
+function fbParseQuantityText(text){
+  const str = String(text || "").trim();
+  const m = str.match(/^(\d+(?:\.\d+)?)\s*(.*)$/);
+  if(m){
+    return { amount: parseFloat(m[1]) || 0, unit: (m[2] || "").trim() || "units" };
+  }
+  return { amount: 0, unit: str || "units" };
+}
+
+/* Adds stock to a category. Accepts free text quantity, e.g. "10 pairs". */
+function fbAddInventoryStock(kind, category, qtyText){
+  const inv = fbGetInventory(kind);
+  const parsed = fbParseQuantityText(qtyText);
+  if(!inv[category]) inv[category] = { amount: 0, unit: parsed.unit || "units" };
+  inv[category].amount = Math.round((inv[category].amount + parsed.amount) * 100) / 100;
+  if(parsed.unit) inv[category].unit = parsed.unit;
+  fbSaveInventory(kind, inv);
+  return inv[category];
+}
+
+/* Deducts stock when a sale record is added */
+function fbDeductInventory(kind, category, qty){
+  const inv = fbGetInventory(kind);
+  if(!inv[category]) inv[category] = { amount: 0, unit: "units" };
+  inv[category].amount = Math.round((inv[category].amount - Number(qty || 0)) * 100) / 100;
+  fbSaveInventory(kind, inv);
+  return inv[category];
+}
+
+/* Returns a display-ready list: every known category plus any custom ones on record */
+function fbGetInventoryList(kind){
+  const inv = fbGetInventory(kind);
+  const known = FB_CATEGORIES[kind];
+  const out = known.map(c => ({
+    category: c,
+    amount: inv[c]?.amount ?? 0,
+    unit: inv[c]?.unit || "units"
+  }));
+  Object.keys(inv).forEach(c=>{
+    if(!known.includes(c)){
+      out.push({ category: c, amount: inv[c].amount, unit: inv[c].unit || "units" });
+    }
+  });
+  return out;
 }
 
 /* ---------------- Session ---------------- */

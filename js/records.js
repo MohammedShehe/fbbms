@@ -31,8 +31,10 @@ function fbInitRecordsPage(kind){
       state.view = tab.dataset.view;
       document.getElementById("section-all").classList.toggle("active", state.view==="all");
       document.getElementById("section-monthly").classList.toggle("active", state.view==="monthly");
+      document.getElementById("section-inventory").classList.toggle("active", state.view==="inventory");
       if(state.view === "all") renderAll();
-      else renderMonthGrid();
+      else if(state.view === "monthly") renderMonthGrid();
+      else renderInventory();
     });
   });
 
@@ -66,19 +68,29 @@ function fbInitRecordsPage(kind){
       ? (document.getElementById("recCategoryOther").value.trim() || "Other")
       : catSelect.value;
 
+    const qty = Number(document.getElementById("recQty").value) || 1;
+    const available = fbGetInventory(kind)[category]?.amount ?? 0;
+
+    if(available < qty){
+      const proceed = confirm(`Only ${available} in stock for "${category}", but you're logging ${qty}. Save anyway? (Stock will go negative until restocked.)`);
+      if(!proceed) return;
+    }
+
     const record = {
       date: document.getElementById("recDate").value || fbFormatDateShort(),
       customer: document.getElementById("recCustomer").value.trim(),
       item: document.getElementById("recItem").value.trim(),
       category,
-      quantity: Number(document.getElementById("recQty").value) || 1,
+      quantity: qty,
       unitPrice: Number(document.getElementById("recUnitPrice").value) || 0,
       notes: document.getElementById("recNotes").value.trim()
     };
     fbAddRecord(kind, record);
     modal.hide();
-    fbToast("Record saved successfully.", "success");
-    if(state.view === "all") renderAll(); else renderMonthGrid();
+    fbToast("Record saved successfully. Inventory updated.", "success");
+    if(state.view === "all") renderAll();
+    else if(state.view === "monthly") renderMonthGrid();
+    else renderInventory();
   });
 
   /* ---------- delete handler (event delegation) ---------- */
@@ -86,10 +98,12 @@ function fbInitRecordsPage(kind){
     const btn = e.target.closest("[data-delete-id]");
     if(!btn) return;
     const id = btn.dataset.deleteId;
-    if(confirm("Delete this record? This cannot be undone.")){
+    if(confirm("Delete this record? This cannot be undone. The sold quantity will be returned to inventory.")){
       fbDeleteRecord(kind, id);
-      fbToast("Record deleted.", "warning");
-      if(state.view === "all") renderAll(); else renderMonthGrid();
+      fbToast("Record deleted. Stock restored.", "warning");
+      if(state.view === "all") renderAll();
+      else if(state.view === "monthly") renderMonthGrid();
+      else renderInventory();
     }
   });
 
@@ -251,6 +265,50 @@ function fbInitRecordsPage(kind){
     state.monthCategory = e.target.value;
     document.getElementById("monthSearchInput").dispatchEvent(new Event("input"));
   });
+
+  /* ---------- INVENTORY VIEW (read-only for managers, auto-updated by sales) ---------- */
+  function stockClass(amount){
+    if(amount <= 0) return { cls:"stock-out", pill:"out", label:"Out of stock" };
+    if(amount <= 5) return { cls:"stock-low", pill:"low", label:"Low stock" };
+    return { cls:"stock-ok", pill:"ok", label:"In stock" };
+  }
+
+  function renderInventory(){
+    const list = fbGetInventoryList(kind);
+    const grid = document.getElementById("inventoryGrid");
+    if(!grid) return;
+    grid.innerHTML = list.map(entry=>{
+      const s = stockClass(entry.amount);
+      return `<div class="fb-inv-card ${s.cls}">
+        <div class="inv-cat">
+          <span>${fbEscapeHtml(entry.category)}</span>
+          <span class="fb-inv-pill ${s.pill}">${s.label}</span>
+        </div>
+        <div class="inv-qty">${entry.amount}</div>
+        <div class="inv-unit">${fbEscapeHtml(entry.unit)} available</div>
+      </div>`;
+    }).join("");
+    const totalUnits = list.reduce((s,e)=> s + (e.amount>0?e.amount:0), 0);
+    const outCount = list.filter(e=> e.amount<=0).length;
+    const lowCount = list.filter(e=> e.amount>0 && e.amount<=5).length;
+    document.getElementById("inventorySummary").innerHTML = `
+      <div class="fb-stat-card">
+        <div class="fb-stat-label">Categories Tracked</div>
+        <div class="fb-stat-value">${list.length}</div>
+        <div class="fb-stat-sub"><i class="bi bi-boxes"></i> Across this division</div>
+      </div>
+      <div class="fb-stat-card">
+        <div class="fb-stat-label">Units In Stock</div>
+        <div class="fb-stat-value">${totalUnits}</div>
+        <div class="fb-stat-sub"><i class="bi bi-box-seam"></i> Combined across categories</div>
+      </div>
+      <div class="fb-stat-card">
+        <div class="fb-stat-label">Needs Attention</div>
+        <div class="fb-stat-value">${outCount + lowCount}</div>
+        <div class="fb-stat-sub"><i class="bi bi-exclamation-triangle"></i> ${outCount} out &middot; ${lowCount} low</div>
+      </div>
+    `;
+  }
 
   /* ---------- initial paint ---------- */
   renderAll();

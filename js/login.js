@@ -19,6 +19,12 @@ function showLoginError(msg){
 }
 function hideLoginError(){ errorBox.classList.remove("show"); }
 
+const FB_ROLE_PAGES_SAFE = {
+  sports: "sports-dashboard.html",
+  scents: "scents-dashboard.html",
+  super:  "super-dashboard.html"
+};
+
 // If already logged in, redirect straight to the right dashboard
 (function redirectIfLoggedIn(){
   const session = fbGetSession();
@@ -26,12 +32,6 @@ function hideLoginError(){ errorBox.classList.remove("show"); }
     window.location.href = FB_ROLE_PAGES_SAFE[session.role];
   }
 })();
-
-const FB_ROLE_PAGES_SAFE = {
-  sports: "sports-dashboard.html",
-  scents: "scents-dashboard.html",
-  super:  "super-dashboard.html"
-};
 
 loginForm.addEventListener("submit", (e)=>{
   e.preventDefault();

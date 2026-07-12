@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>FBBMS | Sports Management</title>
 
 <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
@@ -52,6 +52,7 @@
     <div class="fb-tabs" id="viewTabs">
       <button class="fb-tab active" data-view="all">All Records</button>
       <button class="fb-tab" data-view="monthly">Monthly</button>
+      <button class="fb-tab" data-view="inventory"><i class="bi bi-boxes"></i> Inventory</button>
     </div>
     <button class="fb-fab" id="addRecordFab" title="Add new record"><i class="bi bi-plus-lg"></i></button>
   </div>
@@ -124,6 +125,15 @@
         </table>
       </div>
     </div>
+  </section>
+
+  <!-- INVENTORY VIEW -->
+  <section class="fb-section" id="section-inventory">
+    <div class="fb-stats-grid mb-4" id="inventorySummary"></div>
+    <p class="text-muted-fb mb-3" style="font-size:0.85rem;">
+      <i class="bi bi-info-circle"></i> Stock levels update automatically whenever you log or delete a sale record. Only the Super Manager can add new stock.
+    </p>
+    <div class="fb-inventory-grid" id="inventoryGrid"></div>
   </section>
 
 </main>

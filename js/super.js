@@ -11,8 +11,9 @@
   document.getElementById("logoutBtn").addEventListener("click", fbLogout);
 
   const charts = {}; // kind -> Chart.js instance
+  let invActiveKind = "sports";
 
-  /* ---------------- Main nav: Sports / Scents / Staffs ---------------- */
+  /* ---------------- Main nav: Sports / Scents / Inventory / Staffs ---------------- */
   const mainNavBtns = document.querySelectorAll("#mainNav button");
   mainNavBtns.forEach(btn=>{
     btn.addEventListener("click", ()=>{
@@ -20,9 +21,13 @@
       btn.classList.add("active");
       const target = btn.dataset.section;
       document.querySelectorAll(".fb-section").forEach(sec=> sec.classList.remove("active"));
-      const el = target === "staffs" ? document.getElementById("section-staffs") : document.getElementById(`division-${target}`);
+      let el;
+      if(target === "staffs") el = document.getElementById("section-staffs");
+      else if(target === "inventory") el = document.getElementById("section-inventory");
+      else el = document.getElementById(`division-${target}`);
       el.classList.add("active");
-      if(target !== "staffs") refreshDivision(target);
+      if(target === "sports" || target === "scents") refreshDivision(target);
+      if(target === "inventory") renderInventoryPanel(invActiveKind);
     });
   });
 
@@ -304,6 +309,106 @@
 
   refreshDivision("sports");
   refreshDivision("scents");
+
+  /* ================= INVENTORY ================= */
+  const invSubTabs = document.querySelectorAll("#inventoryDivisionTabs .fb-tab");
+  invSubTabs.forEach(tab=>{
+    tab.addEventListener("click", ()=>{
+      invSubTabs.forEach(t=> t.classList.remove("active"));
+      tab.classList.add("active");
+      invActiveKind = tab.dataset.invKind;
+      document.querySelectorAll(".inv-sub-panel").forEach(p=> p.classList.remove("active"));
+      document.getElementById(`inv-panel-${invActiveKind}`).classList.add("active");
+      renderInventoryPanel(invActiveKind);
+    });
+  });
+
+  function stockMeta(amount){
+    if(amount <= 0) return { cls:"stock-out", pill:"out", label:"Out of stock" };
+    if(amount <= 5) return { cls:"stock-low", pill:"low", label:"Low stock" };
+    return { cls:"stock-ok", pill:"ok", label:"In stock" };
+  }
+
+  function renderInventoryPanel(kind){
+    const list = fbGetInventoryList(kind);
+    const grid = document.getElementById(`inv-grid-${kind}`);
+    grid.innerHTML = list.map(entry=>{
+      const s = stockMeta(entry.amount);
+      return `<div class="fb-inv-card ${s.cls}">
+        <div class="inv-cat">
+          <span>${fbEscapeHtml(entry.category)}</span>
+          <span class="fb-inv-pill ${s.pill}">${s.label}</span>
+        </div>
+        <div class="inv-qty">${entry.amount}</div>
+        <div class="inv-unit">${fbEscapeHtml(entry.unit)} available</div>
+      </div>`;
+    }).join("");
+
+    const totalUnits = list.reduce((s,e)=> s + (e.amount>0?e.amount:0), 0);
+    const outCount = list.filter(e=> e.amount<=0).length;
+    const lowCount = list.filter(e=> e.amount>0 && e.amount<=5).length;
+    document.getElementById(`inv-summary-${kind}`).innerHTML = `
+      <div class="fb-stat-card">
+        <div class="fb-stat-label">Categories Tracked</div>
+        <div class="fb-stat-value">${list.length}</div>
+        <div class="fb-stat-sub"><i class="bi bi-boxes"></i> ${kind === "sports" ? "Sports" : "Scents"} Division</div>
+      </div>
+      <div class="fb-stat-card">
+        <div class="fb-stat-label">Units In Stock</div>
+        <div class="fb-stat-value">${totalUnits}</div>
+        <div class="fb-stat-sub"><i class="bi bi-box-seam"></i> Combined across categories</div>
+      </div>
+      <div class="fb-stat-card">
+        <div class="fb-stat-label">Needs Attention</div>
+        <div class="fb-stat-value">${outCount + lowCount}</div>
+        <div class="fb-stat-sub"><i class="bi bi-exclamation-triangle"></i> ${outCount} out &middot; ${lowCount} low</div>
+      </div>
+    `;
+  }
+
+  renderInventoryPanel("sports");
+  renderInventoryPanel("scents");
+
+  /* ---- Add Stock modal ---- */
+  const stockModalEl = document.getElementById("addStockModal");
+  const stockModal = new bootstrap.Modal(stockModalEl);
+  const stockDivisionSelect = document.getElementById("stockDivision");
+  const stockCategorySelect = document.getElementById("stockCategory");
+
+  function fillStockCategories(kind){
+    stockCategorySelect.innerHTML = FB_CATEGORIES[kind].map(c=> `<option value="${c}">${c}</option>`).join("");
+  }
+
+  document.getElementById("addStockFab").addEventListener("click", ()=>{
+    stockDivisionSelect.value = invActiveKind;
+    fillStockCategories(invActiveKind);
+    document.getElementById("stockQtyText").value = "";
+    document.getElementById("stockFormError").classList.remove("show");
+    stockModal.show();
+  });
+  stockDivisionSelect.addEventListener("change", ()=> fillStockCategories(stockDivisionSelect.value));
+
+  document.getElementById("addStockForm").addEventListener("submit", (e)=>{
+    e.preventDefault();
+    const kind = stockDivisionSelect.value;
+    const category = stockCategorySelect.value;
+    const qtyText = document.getElementById("stockQtyText").value.trim();
+    const errEl = document.getElementById("stockFormError");
+    const errText = document.getElementById("stockFormErrorText");
+
+    const parsed = fbParseQuantityText(qtyText);
+    if(!qtyText || !(parsed.amount > 0)){
+      errText.textContent = 'Please enter a quantity like "10 pairs" or "25 bottles".';
+      errEl.classList.add("show");
+      return;
+    }
+    errEl.classList.remove("show");
+
+    fbAddInventoryStock(kind, category, qtyText);
+    stockModal.hide();
+    fbToast(`Added ${qtyText} to "${category}" (${kind === "sports" ? "Sports" : "Scents"}).`, "success");
+    renderInventoryPanel(kind);
+  });
 
   /* ================= EDIT PROFILE (self password change) ================= */
   const profileModalEl = document.getElementById("editProfileModal");

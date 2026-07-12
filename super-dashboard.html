@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>FBBMS | Super Manager</title>
 
 <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
@@ -45,11 +45,12 @@
 <main class="fb-page-wrap">
 
   <h1 class="fb-page-heading mb-1"><span class="accent-dot"></span> Super Manager Console</h1>
-  <p class="text-muted-fb mb-4">Complete oversight of Sports and Scents divisions, staff, and performance analytics.</p>
+  <p class="text-muted-fb mb-4">Complete oversight of Sports and Scents divisions, inventory, staff, and performance analytics.</p>
 
   <div class="fb-nav-pill mb-4" id="mainNav">
     <button class="active" data-section="sports"><i class="bi bi-dribbble"></i> Sports</button>
     <button data-section="scents"><i class="bi bi-flower2"></i> Scents</button>
+    <button data-section="inventory"><i class="bi bi-boxes"></i> Inventory</button>
     <button data-section="staffs"><i class="bi bi-people"></i> Staffs</button>
   </div>
 
@@ -252,12 +253,76 @@
     </div>
   </section>
 
+  <!-- ============ INVENTORY SECTION ============ -->
+  <section class="fb-section" id="section-inventory">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+      <div class="fb-tabs" id="inventoryDivisionTabs">
+        <button class="fb-tab active" data-inv-kind="sports"><i class="bi bi-dribbble"></i> Sports Inventory</button>
+        <button class="fb-tab" data-inv-kind="scents"><i class="bi bi-flower2"></i> Scents Inventory</button>
+      </div>
+      <button class="fb-fab" id="addStockFab" title="Add stock"><i class="bi bi-plus-lg"></i></button>
+    </div>
+
+    <div class="inv-sub-panel active" id="inv-panel-sports">
+      <div class="fb-stats-grid mb-4" id="inv-summary-sports"></div>
+      <div class="fb-inventory-grid" id="inv-grid-sports"></div>
+    </div>
+
+    <div class="inv-sub-panel" id="inv-panel-scents">
+      <div class="fb-stats-grid mb-4" id="inv-summary-scents"></div>
+      <div class="fb-inventory-grid" id="inv-grid-scents"></div>
+    </div>
+  </section>
+
   <!-- ============ STAFFS SECTION ============ -->
   <section class="fb-section" id="section-staffs">
     <div class="row g-3" id="staffCardsRow"></div>
   </section>
 
 </main>
+
+<!-- ADD STOCK MODAL -->
+<div class="modal fade" id="addStockModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content fb-modal">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-box-seam"></i> Add Inventory Stock</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="addStockForm">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="fb-form-label">Division</label>
+              <select class="fb-form-control" id="stockDivision">
+                <option value="sports">Sports</option>
+                <option value="scents">Scents</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="fb-form-label">Category</label>
+              <select class="fb-form-control" id="stockCategory"></select>
+            </div>
+            <div class="col-12">
+              <label class="fb-form-label">Quantity to add</label>
+              <input type="text" class="fb-form-control" id="stockQtyText" placeholder='e.g. "10 pairs" or "25 bottles"'>
+              <div class="fb-form-hint">Type a number followed by a unit. This amount is added on top of current stock.</div>
+            </div>
+            <div class="col-12">
+              <div class="auth-error" id="stockFormError" style="margin-top:4px;">
+                <i class="bi bi-exclamation-circle"></i><span id="stockFormErrorText"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="fb-btn-outline" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="fb-btn-primary"><i class="bi bi-check2"></i> Add Stock</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 <!-- EDIT PROFILE MODAL -->
 <div class="modal fade" id="editProfileModal" tabindex="-1">

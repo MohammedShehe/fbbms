@@ -97,17 +97,19 @@ body[data-role="super"]{ --accent:var(--super); --accent-dim:var(--super-dim); -
   height:360px;
 }
 
-/* Top nav pill menu (Sports / Scents / Staffs, section switcher) */
+/* Top nav pill menu (Sports / Scents / Staffs / Inventory section switcher) */
 .fb-nav-pill{
-  display:inline-flex; gap:6px;
+  display:inline-flex; gap:6px; flex-wrap:wrap;
   background:var(--panel); border:1px solid var(--border);
   border-radius:var(--radius-pill); padding:5px;
+  max-width:100%;
 }
 .fb-nav-pill button{
   border:none; background:none;
   padding:9px 22px; border-radius:var(--radius-pill);
   color:var(--text-muted); font-weight:600; font-size:0.88rem;
   cursor:pointer; transition:all 0.25s var(--ease-out);
+  white-space:nowrap;
 }
 .fb-nav-pill button.active{
   color:#06090F;
@@ -125,9 +127,17 @@ body[data-role="super"]{ --accent:var(--super); --accent-dim:var(--super-dim); -
   display:flex;
   align-items:center;
   gap:16px;
+  flex-wrap:wrap;
 }
 .fb-staff-card .fb-avatar{ width:48px; height:48px; font-size:1rem; }
 
+/* Inventory sub-tabs (division switch inside Inventory section) */
+.inv-sub-panel{ display:none; }
+.inv-sub-panel.active{ display:block; }
+
 @media (max-width: 576px){
   .fb-chart-canvas-wrap{ height:280px; }
+  .fb-nav-pill button{ padding:8px 16px; font-size:0.82rem; }
+  .fb-staff-card{ padding:16px; }
+  .fb-staff-card > div.d-flex{ width:100%; flex-direction:row; }
 }
