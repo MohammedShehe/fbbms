@@ -70,10 +70,10 @@
         <option value="">All Categories</option>
       </select>
       <select class="fb-select" id="allSortSelect">
-        <option value="date_desc">Newest first</option>
-        <option value="date_asc">Oldest first</option>
-        <option value="total_desc">Highest total</option>
-        <option value="total_asc">Lowest total</option>
+        <option value="newest">Newest first</option>
+        <option value="oldest">Oldest first</option>
+        <option value="highest">Highest total</option>
+        <option value="lowest">Lowest total</option>
       </select>
     </div>
 
@@ -196,13 +196,14 @@
   </div>
 </div>
 
+<!-- All HTML content stays the same, only the script section changes -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="js/utils.js"></script>
-<script src="js/data.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/records.js"></script>
-<script>
-  fbInitRecordsPage("scents");
+<script type="module" src="js/utils.js"></script>
+<script type="module" src="js/api.js"></script>
+<script type="module" src="js/records.js"></script>
+<script type="module">
+  import { fbInitRecordsPage } from './js/records.js';
+  fbInitRecordsPage("scents"); 
 </script>
 </body>
 </html>
