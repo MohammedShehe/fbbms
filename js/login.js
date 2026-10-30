@@ -1,81 +1,59 @@
-// js/login.js
-import { AuthAPI } from './api.js';
-import { fbGetSession, fbSetSession, fbSetToken } from './utils.js';
+import { api, session } from './api.js';
+import { applyTheme, $ } from './ui.js';
 
-document.getElementById("yearNow").textContent = new Date().getFullYear();
+$('#yr').textContent = new Date().getFullYear();
+if (session.token) location.replace('app.html');
+if (new URLSearchParams(location.search).has('expired')) showErr('Your session ended. Please sign in again.');
 
-const loginForm = document.getElementById("loginForm");
-const loginBtn = document.getElementById("loginBtn");
-const errorBox = document.getElementById("loginError");
-const errorText = document.getElementById("loginErrorText");
-const togglePass = document.getElementById("togglePass");
-const pwField = document.getElementById("loginPassword");
+api('/auth/theme', { auth: false }).then(t => { applyTheme(t); $('#platName').textContent = t.name || 'FBBMS'; }).catch(() => {});
 
-togglePass.addEventListener("click", () => {
-    const isPass = pwField.type === "password";
-    pwField.type = isPass ? "text" : "password";
-    togglePass.innerHTML = `<i class="bi ${isPass ? "bi-eye-slash" : "bi-eye"}"></i>`;
-});
+function showErr(m, n = '') { const b = $('#err' + n); $('#errText' + n).textContent = m; b.classList.remove('d-none'); }
+function hideErr() { $('#err').classList.add('d-none'); $('#err2').classList.add('d-none'); }
+function busy(btn, on) { btn.disabled = on; btn.querySelector('.label').innerHTML = on ? '<span class="spinner-border spinner-border-sm me-2"></span>Please wait…' : btn.dataset.label; }
+['loginBtn', 'otpBtn'].forEach(id => { const b = $('#' + id); b.dataset.label = b.querySelector('.label').textContent; });
 
-function showLoginError(msg) {
-    errorText.textContent = msg;
-    errorBox.classList.add("show");
+$('#eye').onclick = () => { const p = $('#pw'); const s = p.type === 'password'; p.type = s ? 'text' : 'password'; $('#eye i').className = 'bi ' + (s ? 'bi-eye-slash' : 'bi-eye'); };
+
+let challenge = null;
+async function finish(res) {
+  session.token = res.token;
+  const prev = session.biz; const list = res.profile.memberships.map(m => m.business.id);
+  session.biz = list.includes(prev) ? prev : (list[0] || null);
+  location.replace('app.html');
 }
 
-function hideLoginError() {
-    errorBox.classList.remove("show");
-}
-
-const FB_ROLE_PAGES = {
-    sports_manager: "sports-dashboard.html",
-    scents_manager: "scents-dashboard.html",
-    super_manager: "super-dashboard.html"
+$('#loginForm').onsubmit = async e => {
+  e.preventDefault(); hideErr();
+  const email = $('#email').value.trim(), password = $('#pw').value;
+  if (!email || !password) return showErr('Enter your email and password');
+  busy($('#loginBtn'), true);
+  try {
+    const r = await api('/auth/login', { method: 'POST', body: { email, password }, auth: false });
+    if (r.otp_required) { challenge = r.challenge; $('#otpEmail').textContent = r.email; $('#stepLogin').classList.add('d-none'); $('#stepOtp').classList.remove('d-none'); $('#otpBoxes input')?.focus(); }
+    else await finish(r);
+  } catch (err) { showErr(err.message); } finally { busy($('#loginBtn'), false); }
 };
 
-// Redirect if already logged in
-(function redirectIfLoggedIn() {
-    const session = fbGetSession();
-    if (session && FB_ROLE_PAGES[session.role]) {
-        window.location.href = FB_ROLE_PAGES[session.role];
-    }
-})();
-
-loginForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    hideLoginError();
-
-    const email = document.getElementById("loginEmail").value.trim().toLowerCase();
-    const password = document.getElementById("loginPassword").value;
-
-    loginBtn.classList.add("loading");
-    loginBtn.disabled = true;
-
-    try {
-        if (email === 'manager@fourbrothers.online') {
-            await AuthAPI.sendOTP(email, password);
-            sessionStorage.setItem("fbbms_pending_login", JSON.stringify({ email, role: 'super_manager' }));
-            window.location.href = "otp.html";
-            return;
-        }
-
-        const result = await AuthAPI.login(email, password);
-        fbSetToken(result.token);
-        fbSetSession({ 
-            email: result.email, 
-            role: result.role,
-            loggedInAt: new Date().toISOString()
-        });
-        
-        if (FB_ROLE_PAGES[result.role]) {
-            window.location.href = FB_ROLE_PAGES[result.role];
-        } else {
-            showLoginError("Unknown role. Please contact support.");
-        }
-
-    } catch (error) {
-        showLoginError(error.message || "Invalid email or password. Please try again.");
-    } finally {
-        loginBtn.classList.remove("loading");
-        loginBtn.disabled = false;
-    }
+// 6 OTP boxes with paste support
+const boxes = $('#otpBoxes');
+boxes.innerHTML = Array.from({ length: 6 }, () => '<input inputmode="numeric" maxlength="1" autocomplete="one-time-code">').join('');
+const ins = [...boxes.children];
+ins.forEach((el, i) => {
+  el.oninput = () => { el.value = el.value.replace(/\D/g, ''); if (el.value && ins[i + 1]) ins[i + 1].focus(); if (ins.every(x => x.value)) verify(); };
+  el.onkeydown = e => { if (e.key === 'Backspace' && !el.value && ins[i - 1]) ins[i - 1].focus(); };
+  el.onpaste = e => { const t = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6); if (!t) return; e.preventDefault(); t.split('').forEach((c, j) => { ins[j].value = c; }); (ins[t.length] || ins[5]).focus(); if (t.length === 6) verify(); };
 });
+async function verify() {
+  hideErr(); const otp = ins.map(i => i.value).join(''); if (otp.length < 6) return showErr('Enter all 6 digits', '2');
+  busy($('#otpBtn'), true);
+  try { await finish(await api('/auth/verify-otp', { method: 'POST', body: { challenge, otp }, auth: false })); }
+  catch (err) { showErr(err.message, '2'); ins.forEach(i => { i.value = ''; }); ins[0].focus(); } finally { busy($('#otpBtn'), false); }
+}
+$('#otpBtn').onclick = verify;
+$('#backLink').onclick = e => { e.preventDefault(); $('#stepOtp').classList.add('d-none'); $('#stepLogin').classList.remove('d-none'); };
+let cool = 0;
+$('#resend').onclick = async e => {
+  e.preventDefault(); if (cool) return;
+  try { const r = await api('/auth/resend-otp', { method: 'POST', body: { challenge }, auth: false }); challenge = r.challenge; cool = 30; const t = setInterval(() => { cool--; $('#resend').textContent = cool ? `Resend in ${cool}s` : 'Resend code'; if (!cool) clearInterval(t); }, 1000); }
+  catch (err) { showErr(err.message, '2'); }
+};

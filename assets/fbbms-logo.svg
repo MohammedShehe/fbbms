@@ -1,0 +1,18 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#18E0A6"/>
+      <stop offset="55%" stop-color="#7C6FF0"/>
+      <stop offset="100%" stop-color="#E0A64C"/>
+    </linearGradient>
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F4F6F8"/>
+      <stop offset="100%" stop-color="#C7CCD4"/>
+    </linearGradient>
+  </defs>
+  <circle cx="60" cy="60" r="54" fill="#0B0E14" stroke="url(#ringGrad)" stroke-width="3"/>
+  <circle cx="60" cy="60" r="46" fill="none" stroke="url(#ringGrad)" stroke-width="1" opacity="0.35"/>
+  <text x="60" y="72" font-family="'Space Grotesk', 'Sora', sans-serif" font-size="40" font-weight="700" text-anchor="middle" fill="url(#textGrad)">4B</text>
+  <circle cx="30" cy="30" r="4" fill="#18E0A6"/>
+  <circle cx="90" cy="90" r="4" fill="#E0A64C"/>
+</svg>
