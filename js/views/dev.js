@@ -1,7 +1,7 @@
 // Developer console: manages the whole platform (businesses, super admins, theme, global audit)
-import { get, post, put, session } from '../api.js';
+import { get, post, put, del, session } from '../api.js';
 import { esc, money, num, compact, shortDay, openModal, fail, ok, pill, initials, ago, fmtDateTime, empty, skeleton, confirmBox, applyTheme, chartTheme, PALETTE, pager, debounce, greeting } from '../ui.js';
-import { BIZ_LOGOS, DEFAULT_LOGO } from '../config.js';
+import { BIZ_LOGOS, DEFAULT_LOGO, API_BASE } from '../config.js';
 import { detailText } from './audit.js';
 
 const showPw = (name, email, pw) => openModal({ title: '🔑 Temporary password', size: 'modal-sm', body: `<p>For <b>${esc(name)}</b> (${esc(email)}). Shown <b>only once</b>; they must change it at first sign-in.</p><div class="pw-box">${esc(pw)}</div><button class="btn btn-soft w-100 mt-3" onclick="navigator.clipboard.writeText('${esc(pw)}');this.textContent='Copied ✓'">Copy</button>` });
@@ -88,4 +88,169 @@ export const views = {
     const load = async () => { const r = await get('/developer/audit', st); el.querySelector('#r').innerHTML = r.rows.map(a => `<tr><td data-label="When">${fmtDateTime(a.created_at)}</td><td data-label="Business">${esc(a.business || 'platform')}</td><td data-label="Who">${esc(a.user_name || 'system')}</td><td data-label="Action">${pill(a.action, 'gold')}</td><td data-label="Details" class="small" style="max-width:420px;word-break:break-word">${esc(detailText(a.details))}</td></tr>`).join('') || `<tr><td colspan="5">${empty('bi-journal', 'Nothing recorded')}</td></tr>`; pager(el.querySelector('#pg'), r, p => { st.page = p; load(); }); };
     el.querySelector('#b').onchange = e => { st.business = e.target.value; st.page = 1; load(); }; el.querySelector('#q').oninput = debounce(e => { st.q = e.target.value; st.page = 1; load(); }, 350); await load();
   }
+};
+
+/* =====================================================================================
+   Developer console, part 2: AI settings, feature modules, API control, system, security
+   ===================================================================================== */
+const sw = (id, label, on, hint = '') => `<div class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" id="${id}" ${on ? 'checked' : ''}><label class="form-check-label fw-semibold" for="${id}">${esc(label)}</label>${hint ? `<div class="small muted">${esc(hint)}</div>` : ''}</div>`;
+const kpi = (label, val, icon = 'bi-activity', c = 'var(--primary)', sub = '') => `<div class="col-6 col-lg-3"><div class="kpi" style="--c:${c}"><div class="lbl"><i class="bi ${icon} me-1"></i>${esc(label)}</div><div class="val">${val}</div>${sub ? `<div class="small muted">${esc(sub)}</div>` : ''}</div></div>`;
+const bytes = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+const dur = s => { const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60); return (d ? d + 'd ' : '') + (h ? h + 'h ' : '') + m + 'm'; };
+const devCharts = [];
+const killCharts = () => { while (devCharts.length) { try { devCharts.pop().destroy(); } catch (_) { /* gone */ } } };
+
+Object.assign(views, {
+  /* ---------------- AI settings ---------------- */
+  async ai(el, ctx) {
+    el.innerHTML = `<div class="page-head"><div><h1>AI settings</h1><p>Connect the AI provider once for the whole platform. The key is stored encrypted and is never shown again. Each business also needs the “AI business assistant” module switched on.</p></div></div><div id="o">${skeleton(4, 80)}</div>`;
+    ctx.cleanup = killCharts;
+    const load = async () => {
+      const [c, u] = await Promise.all([get('/developer/ai'), get('/developer/ai/usage')]);
+      const keyState = c.key_unreadable ? `<span class="pill danger">Saved key cannot be read — enter it again</span>` : c.key_set ? `<span class="pill success"><i class="bi bi-check2"></i> Key saved</span> <span class="small muted">${esc(c.key_mask)}</span>` : `<span class="pill warning">No key yet</span>`;
+      el.querySelector('#o').innerHTML = `<div class="row g-3 mb-3">
+        <div class="col-lg-6"><div class="fb-card h-100"><h3>Provider</h3><div class="card-sub">Any OpenAI-compatible chat API. Default: Groq with <b>openai/gpt-oss-20b</b>.</div>
+          ${sw('en', 'AI assistant enabled platform-wide', c.enabled, 'Turn off to stop all AI calls immediately.')}
+          <div class="row g-2"><div class="col-md-4"><label class="form-label">Provider</label><input class="form-control" id="pv" value="${esc(c.provider)}" placeholder="groq"></div>
+          <div class="col-md-8"><label class="form-label">Model</label><input class="form-control" id="md" value="${esc(c.model)}" placeholder="openai/gpt-oss-20b"></div>
+          <div class="col-12"><label class="form-label">API address (base URL)</label><input class="form-control" id="bu" value="${esc(c.base_url)}" placeholder="https://api.groq.com/openai/v1"></div>
+          <div class="col-12"><label class="form-label">API key</label><div class="mb-1">${keyState}</div><input class="form-control" id="ky" type="password" autocomplete="new-password" placeholder="Paste a new key to replace it (leave empty to keep the saved one)"></div></div>
+          <div class="d-flex gap-2 flex-wrap mt-3"><button class="btn btn-fb" id="sv"><i class="bi bi-save me-1"></i>Save</button><button class="btn btn-soft" id="ts"><i class="bi bi-lightning-charge me-1"></i>Test connection</button>${c.key_set ? '<button class="btn btn-danger-soft" id="ck">Remove key</button>' : ''}</div><div id="tr" class="mt-3"></div></div></div>
+        <div class="col-lg-6"><div class="fb-card h-100"><h3>Behaviour & limits</h3><div class="card-sub">Keep costs predictable.</div><div class="row g-2">
+          <div class="col-6"><label class="form-label">Temperature (0–1.5)</label><input type="number" step="0.1" min="0" max="1.5" class="form-control" id="tp" value="${esc(c.temperature)}"></div>
+          <div class="col-6"><label class="form-label">Reasoning effort</label><select class="form-select" id="re">${['', 'low', 'medium', 'high'].map(v => `<option value="${v}" ${c.reasoning_effort === v ? 'selected' : ''}>${v || 'provider default'}</option>`).join('')}</select></div>
+          <div class="col-6"><label class="form-label">Max answer tokens</label><input type="number" min="200" max="8000" class="form-control" id="mt" value="${esc(c.max_tokens)}"></div>
+          <div class="col-6"><label class="form-label">Max tool rounds</label><input type="number" min="1" max="10" class="form-control" id="mr" value="${esc(c.max_rounds)}"></div>
+          <div class="col-6"><label class="form-label">Questions per business / day</label><input type="number" min="1" class="form-control" id="dl" value="${esc(c.daily_limit_per_business)}"></div>
+          <div class="col-6"><label class="form-label">Per user / minute</label><input type="number" min="1" max="60" class="form-control" id="pm" value="${esc(c.per_user_per_minute)}"></div>
+          <div class="col-12"><label class="form-label">Extra instructions (optional, max 1000 chars)</label><textarea class="form-control" id="ei" rows="3" maxlength="1000" placeholder="e.g. Answer in the business owner's language when asked in Swahili.">${esc(c.extra_instructions)}</textarea></div></div>
+          <div class="small muted mt-2"><i class="bi bi-shield-check me-1"></i>Answers come only from each business's own authorised data through fixed tools; nothing is invented.</div></div></div></div>
+        <div class="row g-3 mb-3">${[['24 hours', u.last_24h], ['7 days', u.last_7d], ['30 days', u.last_30d]].map(([l, t]) => kpi('Calls · ' + l, num(t.calls), 'bi-chat-dots', 'var(--primary)', `${num(Number(t.prompt_tokens) + Number(t.completion_tokens))} tokens · ${num(t.errors)} errors · ${num(t.avg_ms)} ms avg`).replace('col-6 col-lg-3', 'col-12 col-md-4')).join('')}</div>
+        <div class="row g-3"><div class="col-lg-5"><div class="fb-card h-100"><h3>Usage by business</h3><div class="card-sub">Last 30 days</div>${u.per_business.length ? '<div class="chart-box"><canvas id="cv"></canvas></div>' : empty('bi-robot', 'No AI usage yet')}</div></div>
+        <div class="col-lg-7"><div class="fb-card h-100"><h3>Recent questions</h3><div class="card-sub">Latest 60 calls</div><div class="tbl-wrap" style="max-height:380px;overflow:auto"><table class="fb-table"><thead><tr><th>When</th><th>Business</th><th>By</th><th>Question</th><th class="num">Tokens</th><th>Result</th></tr></thead><tbody>${u.recent.map(r => `<tr><td>${fmtDateTime(r.created_at)}</td><td>${esc(r.business || '—')}</td><td>${esc(r.user_name || '—')}</td><td style="max-width:260px">${esc(String(r.question || r.kind || '').slice(0, 120))}</td><td class="num">${num(r.tokens)}</td><td>${r.status === 'error' ? pill('error', 'danger') + `<div class="small muted">${esc(String(r.error || '').slice(0, 80))}</div>` : pill(r.latency_ms + ' ms', 'success')}</td></tr>`).join('') || '<tr><td colspan="6" class="text-center muted">Nothing yet</td></tr>'}</tbody></table></div></div></div></div>`;
+      const $ = s => el.querySelector(s);
+      $('#sv').onclick = async () => {
+        const body = { enabled: $('#en').checked, provider: $('#pv').value, model: $('#md').value, base_url: $('#bu').value, temperature: $('#tp').value, reasoning_effort: $('#re').value, max_tokens: $('#mt').value, max_rounds: $('#mr').value, daily_limit_per_business: $('#dl').value, per_user_per_minute: $('#pm').value, extra_instructions: $('#ei').value };
+        if ($('#ky').value.trim()) body.api_key = $('#ky').value.trim();
+        try { await put('/developer/ai', body); ok('AI settings saved'); load(); } catch (e) { fail(e); }
+      };
+      $('#ts').onclick = async () => {
+        const b = $('#ts'); b.disabled = true; $('#tr').innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Contacting the provider…';
+        try { const r = await post('/developer/ai/test'); $('#tr').innerHTML = r.ok ? `<div class="pill success">Connected</div> <span class="small">${esc(r.model)} · ${r.ms} ms${r.tokens ? ` · ${r.tokens} tokens` : ''} · reply “${esc(r.reply)}”</span>` : `<div class="pill danger">Failed</div> <span class="small">${esc(r.message)}${r.status ? ` (HTTP ${r.status})` : ''}</span>`; }
+        catch (e) { $('#tr').innerHTML = `<span class="text-danger small">${esc(e.message)}</span>`; }
+        b.disabled = false;
+      };
+      const ck = $('#ck'); if (ck) ck.onclick = async () => { if (!(await confirmBox({ title: 'Remove the AI key?', message: 'The assistant stops working until you enter a key again.', confirmText: 'Remove', danger: true }))) return; try { await put('/developer/ai', { clear_key: true }); ok('Key removed'); load(); } catch (e) { fail(e); } };
+      killCharts();
+      if (u.per_business.length) { const t = chartTheme(); Chart.defaults.color = t.text; devCharts.push(new Chart($('#cv'), { type: 'bar', data: { labels: u.per_business.map(b => b.business || 'unknown'), datasets: [{ label: 'Calls', data: u.per_business.map(b => Number(b.calls)), backgroundColor: PALETTE[0] }, { label: 'Errors', data: u.per_business.map(b => Number(b.errors || 0)), backgroundColor: PALETTE[3] }] }, options: { maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: t.grid } }, x: { grid: { display: false } } } } })); }
+    };
+    await load();
+  },
+
+  /* ---------------- feature modules ---------------- */
+  async modules(el, ctx) {
+    el.innerHTML = `<div class="page-head"><div><h1>Feature modules</h1><p>Switch features on or off for each business. Super Admins only see what you enable.</p></div></div><div id="o">${skeleton(4, 60)}</div>`;
+    const load = async () => {
+      const [m, bs, gr] = await Promise.all([get('/developer/modules'), get('/developer/businesses'), get('/developer/groups')]);
+      const info = Object.fromEntries(bs.map(b => [b.id, b]));
+      el.querySelector('#o').innerHTML = `<div class="tbl-wrap"><table class="fb-table"><thead><tr><th>Business</th><th>Region</th><th>Branch group</th>${m.modules.map(x => `<th class="text-center" title="${esc(x.desc)}">${esc(x.label)}</th>`).join('')}</tr></thead><tbody>
+        ${m.businesses.map(b => { const i = info[b.id] || {}; const tz = (i.settings && i.settings.timezone) || i.timezone || '—'; return `<tr><td><b>${esc(b.name)}</b><br>${b.status === 'suspended' ? pill('suspended', 'danger') : ''}<small class="muted">${esc(i.template || '')}</small></td>
+          <td><small>${esc(tz)}<br>${esc(i.currency || '')}</small></td>
+          <td><select class="form-select form-select-sm" data-g="${b.id}" style="min-width:140px"><option value="">— none —</option>${gr.groups.map(g => `<option value="${g.id}" ${(gr.businesses.find(x => x.id === b.id) || {}).group_id === g.id ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}</select></td>
+          ${m.modules.map(x => `<td class="text-center"><div class="form-check form-switch d-inline-block m-0"><input class="form-check-input" type="checkbox" data-b="${b.id}" data-k="${x.key}" ${b.enabled[x.key] ? 'checked' : ''}></div></td>`).join('')}</tr>`; }).join('')}</tbody></table></div>
+        <div class="fb-card mt-3"><h3>What each module does</h3><div class="row g-2 mt-1">${m.modules.map(x => `<div class="col-md-6"><div class="feed-item"><div class="flex-grow-1"><div class="fw-semibold">${esc(x.label)} ${x.default ? pill('on by default', 'success') : pill('off by default')}</div><div class="small muted">${esc(x.desc)}</div></div></div></div>`).join('')}</div></div>`;
+      el.querySelectorAll('[data-k]').forEach(i => i.onchange = async () => { try { await put(`/developer/businesses/${i.dataset.b}/modules`, { modules: { [i.dataset.k]: i.checked } }); ok(i.checked ? 'Module enabled' : 'Module disabled'); } catch (e) { i.checked = !i.checked; fail(e); } });
+      el.querySelectorAll('[data-g]').forEach(s => s.onchange = async () => { try { await put(`/developer/businesses/${s.dataset.g}/group`, { group_id: s.value || null }); ok('Branch group updated'); } catch (e) { fail(e); } });
+    };
+    await load();
+  },
+
+  /* ---------------- public API control ---------------- */
+  async api(el, ctx) {
+    el.innerHTML = `<div class="page-head"><div><h1>API & integrations</h1><p>Control the public API (<code>/api/v1</code>) that businesses use to connect their websites and apps.</p></div></div><div id="o">${skeleton(4, 70)}</div>`;
+    const load = async () => {
+      const [p, k, sys] = await Promise.all([get('/developer/api-policy'), get('/developer/api-keys'), get('/developer/system')]);
+      const pol = p.policy; const tot = k.keys.reduce((a, x) => ({ r: a.r + Number(x.requests_24h), e: a.e + Number(x.errors_24h) }), { r: 0, e: 0 });
+      el.querySelector('#o').innerHTML = `<div class="row g-3 mb-3">${kpi('API requests · 24h', num(sys.counts.api_requests_24h), 'bi-arrow-left-right')}${kpi('Errors from keys · 24h', num(tot.e), 'bi-exclamation-octagon', 'var(--danger)', tot.r ? Math.round(tot.e / tot.r * 100) + '% of key traffic' : '')}${kpi('Active keys', num(k.keys.filter(x => x.status === 'active').length), 'bi-key', 'var(--success)', `of ${k.keys.length}`)}${kpi('Webhooks', num(k.webhooks.length), 'bi-broadcast', 'var(--info,#56a8ff)', `${k.webhooks.filter(h => h.failure_count > 0).length} with failures`)}</div>
+        <div class="fb-card mb-3"><h3>Platform policy</h3><div class="card-sub">Applies to every business.</div>${sw('pe', 'Public API enabled', pol.enabled, 'Off = every key stops working at once.')}
+          <div class="row g-2"><div class="col-md-4"><label class="form-label">Default rate limit (req/min)</label><input type="number" class="form-control" id="rl" min="10" max="1000" value="${esc(pol.default_rate_limit)}"></div><div class="col-md-4"><label class="form-label">Max keys per business</label><input type="number" class="form-control" id="mk" min="1" max="100" value="${esc(pol.max_keys_per_business)}"></div><div class="col-md-4"><label class="form-label">Max webhooks per business</label><input type="number" class="form-control" id="mw" min="0" max="50" value="${esc(pol.max_webhooks_per_business)}"></div></div>
+          <div class="d-flex flex-wrap gap-2 mt-3 align-items-center"><button class="btn btn-fb" id="sv">Save policy</button><span class="small muted">Scopes: ${(Array.isArray(p.scopes) ? p.scopes : Object.keys(p.scopes || {})).map(s => `<code>${esc(s)}</code>`).join(' ')}</span></div></div>
+        <div class="fb-card mb-3"><h3>API keys</h3><div class="card-sub">Keys are created by each business's Super Admin; you can limit or revoke any of them.</div><div class="tbl-wrap"><table class="fb-table"><thead><tr><th>Key</th><th>Business</th><th>Scopes / origins</th><th class="num">24h</th><th class="num">Total</th><th>Last used</th><th>Rate</th><th></th></tr></thead><tbody>
+          ${k.keys.map(x => `<tr class="${x.status !== 'active' ? 'voided' : ''}"><td><b>${esc(x.name)}</b><br><code class="small">${esc(x.key_prefix)}…</code> ${x.status === 'active' ? pill('active', 'success') : pill(x.status, 'danger')}</td><td>${esc(x.business)}</td><td class="small">${x.scopes.map(s => pill(s)).join(' ')}<div class="muted">${x.allowed_origins.length ? esc(x.allowed_origins.join(', ')) : 'any origin'}</div></td><td class="num">${num(x.requests_24h)}${Number(x.errors_24h) ? `<br><small class="text-danger">${x.errors_24h} err</small>` : ''}</td><td class="num">${num(x.request_count)}</td><td>${x.last_used_at ? ago(x.last_used_at) : 'never'}</td>
+            <td><input type="number" min="10" max="1000" class="form-control form-control-sm" style="width:80px" data-r="${x.id}" value="${esc(x.rate_limit)}"></td><td class="text-end"><button class="btn btn-sm ${x.status === 'active' ? 'btn-danger-soft' : 'btn-soft'}" data-s="${x.id}" data-st="${x.status}">${x.status === 'active' ? 'Revoke' : 'Re-activate'}</button></td></tr>`).join('') || '<tr><td colspan="8" class="text-center muted">No API keys yet</td></tr>'}</tbody></table></div></div>
+        <div class="fb-card"><h3>Webhooks</h3><div class="card-sub">Signed event deliveries to external URLs.</div><div class="tbl-wrap"><table class="fb-table"><thead><tr><th>URL</th><th>Business</th><th>Events</th><th>Last delivery</th><th class="num">Failures</th><th></th></tr></thead><tbody>
+          ${k.webhooks.map(h => `<tr class="${h.status !== 'active' ? 'voided' : ''}"><td style="max-width:280px;word-break:break-all"><small>${esc(h.url)}</small></td><td>${esc(h.business)}</td><td class="small">${h.events.map(e => pill(e)).join(' ')}</td><td>${h.last_status ? pill('HTTP ' + h.last_status, h.last_status < 300 ? 'success' : 'danger') : '<span class="muted">never</span>'}</td><td class="num">${h.failure_count}</td><td class="text-end"><button class="btn btn-sm btn-soft" data-w="${h.id}" data-st="${h.status}">${h.status === 'active' ? 'Disable' : 'Enable'}</button></td></tr>`).join('') || '<tr><td colspan="6" class="text-center muted">No webhooks</td></tr>'}</tbody></table></div></div>`;
+      const $ = s => el.querySelector(s);
+      $('#sv').onclick = async () => { try { await put('/developer/api-policy', { enabled: $('#pe').checked, default_rate_limit: $('#rl').value, max_keys_per_business: $('#mk').value, max_webhooks_per_business: $('#mw').value }); ok('API policy saved'); load(); } catch (e) { fail(e); } };
+      el.querySelectorAll('[data-s]').forEach(b => b.onclick = async () => { const revoke = b.dataset.st === 'active'; if (revoke && !(await confirmBox({ title: 'Revoke this key?', message: 'Any site using it stops working immediately. You can re-activate it later.', confirmText: 'Revoke', danger: true }))) return; try { await put('/developer/api-keys/' + b.dataset.s, { status: revoke ? 'revoked' : 'active', rate_limit: el.querySelector(`[data-r="${b.dataset.s}"]`).value }); ok(revoke ? 'Key revoked' : 'Key re-activated'); load(); } catch (e) { fail(e); } });
+      el.querySelectorAll('[data-r]').forEach(i => i.onchange = async () => { const row = k.keys.find(x => x.id == i.dataset.r); try { await put('/developer/api-keys/' + i.dataset.r, { status: row.status, rate_limit: i.value }); ok('Rate limit updated'); } catch (e) { fail(e); } });
+      el.querySelectorAll('[data-w]').forEach(b => b.onclick = async () => { try { await put('/developer/webhooks/' + b.dataset.w, { status: b.dataset.st === 'active' ? 'disabled' : 'active' }); load(); } catch (e) { fail(e); } });
+    };
+    await load();
+  },
+
+  /* ---------------- system, maintenance, backups, groups ---------------- */
+  async system(el, ctx) {
+    el.innerHTML = `<div class="page-head"><div><h1>System & backups</h1><p>Server health, maintenance mode, database backups and branch groups.</p></div><button class="btn btn-soft" id="rf"><i class="bi bi-arrow-repeat me-1"></i>Refresh</button></div><div id="o">${skeleton(5, 70)}</div>`;
+    const load = async () => {
+      const [s, g] = await Promise.all([get('/developer/system'), get('/developer/groups')]);
+      const sv = s.server, c = s.counts, sc = s.scheduler, bk = s.backup;
+      const svc = (n, on, bad = false) => `<span class="pill ${on ? 'success' : bad ? 'danger' : 'warning'} me-1 mb-1">${on ? '✓' : '✗'} ${n}</span>`;
+      el.querySelector('#o').innerHTML = `${s.platform.maintenance ? '<div class="alert alert-warning"><i class="bi bi-cone-striped me-2"></i><b>Maintenance mode is ON.</b> Shop users see a notice; only you can sign in to businesses.</div>' : ''}
+        <div class="row g-3 mb-3">${kpi('Uptime', dur(sv.uptime_s), 'bi-clock-history', 'var(--success)', sv.node + ' · ' + sv.env)}${kpi('Memory', sv.rss_mb + ' MB', 'bi-memory', 'var(--primary)', 'heap ' + sv.heap_mb + ' MB')}${kpi('Database', sv.db_latency_ms + ' ms', 'bi-database', 'var(--primary)', 'round-trip')}${kpi('Server errors (5xx)', num(s.errors.total_5xx), 'bi-bug', s.errors.total_5xx ? 'var(--danger)' : 'var(--success)', 'since start')}</div>
+        <div class="row g-3 mb-3"><div class="col-lg-6"><div class="fb-card h-100"><h3>Platform</h3><div class="card-sub">Counts & services</div><div class="row text-center g-2 mb-3">${[['Businesses', c.businesses], ['Users', c.users], ['Sales', c.sales], ['Products', c.products], ['Customers', c.customers], ['Live sessions', c.active_sessions], ['API req · 24h', c.api_requests_24h], ['AI calls · 24h', c.ai_calls_24h], ['Failed logins · 24h', c.failed_logins_24h]].map(([l, v]) => `<div class="col-4"><div class="fw-bold">${num(v)}</div><div class="small muted">${l}</div></div>`).join('')}</div>
+          <div>${svc('Email (SMTP)', s.services.email)}${svc('Image uploads', s.services.images)}${svc('AI provider', s.services.ai)}${svc('JWT secret strong', s.services.jwt_secret_ok, true)}${svc('Scheduler', sc.enabled)}</div>
+          <div class="small muted mt-2">Scheduler: ${sc.enabled ? 'running' : 'disabled'} · runs ${sc.runs}${sc.last_run ? ' · last ' + ago(sc.last_run) : ''}${sc.last_error ? ` · <span class="text-danger">last error: ${esc(sc.last_error)}</span>` : ''}</div></div></div>
+        <div class="col-lg-6"><div class="fb-card h-100"><h3>Maintenance mode</h3><div class="card-sub">Pauses all shop access (and the public API) while you update the system.</div>${sw('mm', 'Maintenance mode', s.platform.maintenance)}<label class="form-label">Message shown to users</label><textarea class="form-control" id="mmsg" rows="2" maxlength="300">${esc(s.platform.maintenance_message)}</textarea><button class="btn btn-fb mt-3" id="mms">Save</button></div></div></div>
+        <div class="fb-card mb-3"><h3>Recent server errors</h3><div class="card-sub">Last 25 5xx responses (cleared on restart)</div>${s.errors.recent.length ? `<div class="tbl-wrap"><table class="fb-table"><thead><tr><th>When</th><th>Request</th><th>Message</th></tr></thead><tbody>${s.errors.recent.map(e => `<tr><td>${fmtDateTime(e.at)}</td><td><code>${esc(e.method)} ${esc(e.path)}</code></td><td>${esc(e.message)}</td></tr>`).join('')}</tbody></table></div>` : empty('bi-emoji-smile', 'No errors recorded')}</div>
+        <div class="fb-card mb-3"><div class="d-flex justify-content-between flex-wrap gap-2 align-items-start"><div><h3>Backups</h3><div class="card-sub">Compressed SQL snapshots of every table.</div></div><button class="btn btn-fb" id="bkr"><i class="bi bi-cloud-arrow-down me-1"></i>Back up now</button></div>
+          <div class="row g-2 align-items-end mb-3"><div class="col-12 col-md-4">${sw('be', 'Automatic daily backup', bk.settings.enabled)}</div><div class="col-6 col-md-2"><label class="form-label">At hour (server time)</label><input type="number" min="0" max="23" class="form-control" id="bh" value="${esc(bk.settings.hour)}"></div><div class="col-6 col-md-2"><label class="form-label">Keep newest</label><input type="number" min="1" max="60" class="form-control" id="bn" value="${esc(bk.settings.keep)}"></div><div class="col-12 col-md-2"><button class="btn btn-soft w-100" id="bks">Save</button></div></div>
+          ${bk.files.length ? `<div class="tbl-wrap"><table class="fb-table"><thead><tr><th>File</th><th>Created</th><th class="num">Size</th><th></th></tr></thead><tbody>${bk.files.map(f => `<tr><td><code>${esc(f.name)}</code></td><td>${fmtDateTime(f.created_at)}</td><td class="num">${bytes(f.size)}</td><td class="text-end"><button class="btn btn-sm btn-soft" data-d="${esc(f.name)}"><i class="bi bi-download"></i></button> <button class="btn btn-sm btn-danger-soft" data-x="${esc(f.name)}"><i class="bi bi-trash"></i></button></td></tr>`).join('')}</tbody></table></div>` : empty('bi-archive', 'No backups yet', 'Click “Back up now” to create the first one.')}
+          <div class="small muted mt-2">Store a copy off the server too. Backups contain customer data — keep them private.</div></div>
+        <div class="fb-card"><h3>Branch groups</h3><div class="card-sub">Group businesses that are branches of one company so their Super Admins can compare performance and transfer stock.</div>
+          ${g.groups.map(x => `<div class="feed-item"><div class="flex-grow-1"><div class="fw-semibold">${esc(x.name)}</div><div class="small muted">${x.businesses.length ? x.businesses.map(b => esc(b.short_name)).join(', ') : 'no businesses yet'}</div></div><button class="btn btn-sm btn-danger-soft" data-gd="${x.id}">Delete</button></div>`).join('') || '<div class="muted small mb-2">No groups yet.</div>'}
+          <div class="row g-2 mt-2"><div class="col-md-6"><input class="form-control" id="gn" placeholder="New group name, e.g. ZanLux Branches"></div><div class="col-md-3"><button class="btn btn-fb w-100" id="ga">Create group</button></div></div>
+          <div class="small muted mt-2">Assign businesses to a group from the “Feature modules” page.</div></div>`;
+      const $ = s => el.querySelector(s);
+      $('#mms').onclick = async () => { const on = $('#mm').checked; if (on && !(await confirmBox({ title: 'Switch maintenance mode ON?', message: 'Everyone except Developers will be blocked from the businesses until you switch it off.', confirmText: 'Switch on', danger: true }))) return; try { await put('/developer/platform', { maintenance: on, maintenance_message: $('#mmsg').value }); ok(on ? 'Maintenance mode ON' : 'Maintenance mode OFF'); load(); } catch (e) { fail(e); } };
+      $('#bkr').onclick = async () => { const b = $('#bkr'); b.disabled = true; b.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Working…'; try { const r = await post('/developer/backups/run'); ok('Backup created', r.name || ''); load(); } catch (e) { fail(e); b.disabled = false; } };
+      $('#bks').onclick = async () => { try { await put('/developer/backups/settings', { enabled: $('#be').checked, hour: $('#bh').value, keep: $('#bn').value }); ok('Backup settings saved'); } catch (e) { fail(e); } };
+      el.querySelectorAll('[data-d]').forEach(b => b.onclick = async () => { try { const r = await fetch(`${API_BASE}/developer/backups/${encodeURIComponent(b.dataset.d)}`, { headers: { Authorization: 'Bearer ' + session.token } }); if (!r.ok) throw new Error('Download failed'); const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = b.dataset.d; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); } catch (e) { fail(e); } });
+      el.querySelectorAll('[data-x]').forEach(b => b.onclick = async () => { if (!(await confirmBox({ title: 'Delete this backup?', message: esc(b.dataset.x), confirmText: 'Delete', danger: true }))) return; try { await del('/developer/backups/' + encodeURIComponent(b.dataset.x)); load(); } catch (e) { fail(e); } });
+      el.querySelectorAll('[data-gd]').forEach(b => b.onclick = async () => { if (!(await confirmBox({ title: 'Delete this group?', message: 'Businesses stay; they just stop being linked as branches.', confirmText: 'Delete', danger: true }))) return; try { await del('/developer/groups/' + b.dataset.gd); load(); } catch (e) { fail(e); } });
+      $('#ga').onclick = async () => { try { await post('/developer/groups', { name: $('#gn').value }); ok('Group created'); load(); } catch (e) { fail(e); } };
+    };
+    el.querySelector('#rf').onclick = () => load().catch(fail);
+    await load();
+  },
+
+  /* ---------------- security & sessions ---------------- */
+  async security(el, ctx) {
+    el.innerHTML = `<div class="page-head"><div><h1>Security & sessions</h1><p>Sign-in activity across the platform. Sign users out of every device if an account looks compromised.</p></div></div><div id="o">${skeleton(4, 70)}</div>`;
+    const load = async () => {
+      const [s, users] = await Promise.all([get('/developer/security'), get('/developer/users')]);
+      el.querySelector('#o').innerHTML = `<div class="row g-3 mb-3"><div class="col-lg-6"><div class="fb-card h-100"><h3>Failed sign-ins</h3><div class="card-sub">Most recent 40</div>${s.failed.length ? `<div class="tbl-wrap" style="max-height:340px;overflow:auto"><table class="fb-table"><thead><tr><th>When</th><th>Email</th><th>IP</th><th>Reason</th></tr></thead><tbody>${s.failed.map(f => `<tr><td>${fmtDateTime(f.created_at)}</td><td>${esc(f.email || '—')}</td><td><code>${esc(f.ip || '')}</code></td><td>${esc(f.note || '')}</td></tr>`).join('')}</tbody></table></div>` : empty('bi-shield-check', 'No failed sign-ins')}</div></div>
+        <div class="col-lg-6"><div class="fb-card h-100"><h3>Recent successful sign-ins</h3><div class="card-sub">Most recent 40</div><div class="tbl-wrap" style="max-height:340px;overflow:auto"><table class="fb-table"><thead><tr><th>When</th><th>User</th><th>IP</th><th>Device</th></tr></thead><tbody>${s.recent_ok.map(f => `<tr><td>${fmtDateTime(f.created_at)}</td><td>${esc(f.name)}<br><small class="muted">${esc(f.email)}</small></td><td><code>${esc(f.ip || '')}</code></td><td class="small">${esc(String(f.user_agent || '').slice(0, 60))}</td></tr>`).join('')}</tbody></table></div></div></div></div>
+        <div class="fb-card"><h3>Accounts</h3><div class="card-sub">Look at a user's devices or sign them out everywhere.</div><div class="tbl-wrap"><table class="fb-table stack"><thead><tr><th>User</th><th>Last sign-in</th><th>Status</th><th></th></tr></thead><tbody>${users.map(u => `<tr><td data-label="User"><div class="d-flex gap-2 align-items-center"><span class="avatar">${esc(initials(u.name))}</span><div class="text-start"><b>${esc(u.name)}</b><br><small class="muted">${esc(u.email)}</small></div></div></td><td data-label="Last">${u.last_login ? ago(u.last_login) : 'never'}</td><td data-label="Status">${u.status === 'active' ? pill('active', 'success') : pill(u.status, 'danger')}${u.is_developer ? ' ' + pill('developer', 'gold') : ''}</td><td class="text-end"><button class="btn btn-sm btn-soft" data-l="${u.id}">Devices & history</button> <button class="btn btn-sm btn-danger-soft" data-r="${u.id}" data-n="${esc(u.name)}">Sign out everywhere</button></td></tr>`).join('')}</tbody></table></div></div>`;
+      el.querySelectorAll('[data-r]').forEach(b => b.onclick = async () => { if (!(await confirmBox({ title: `Sign ${b.dataset.n} out everywhere?`, message: 'All their devices must sign in again.', confirmText: 'Sign out', danger: true }))) return; try { const r = await post(`/developer/users/${b.dataset.r}/revoke-sessions`); ok('Signed out', `${r.revoked} session(s) ended`); } catch (e) { fail(e); } });
+      el.querySelectorAll('[data-l]').forEach(b => b.onclick = async () => {
+        const m = openModal({ size: 'modal-lg', title: 'Devices & sign-in history', body: skeleton(4, 30) });
+        try { const r = await get(`/developer/users/${b.dataset.l}/logins`); m.el.querySelector('.modal-body').innerHTML = `<h6>Sessions</h6><div class="tbl-wrap mb-3"><table class="fb-table"><thead><tr><th>Device</th><th>IP</th><th>Started</th><th>Last seen</th><th></th></tr></thead><tbody>${r.sessions.map(x => `<tr><td>${esc(x.device || '—')}</td><td><code>${esc(x.ip || '')}</code></td><td>${fmtDateTime(x.created_at)}</td><td>${x.last_seen ? ago(x.last_seen) : '—'}</td><td>${x.revoked ? pill('ended') : pill('active', 'success')}</td></tr>`).join('') || '<tr><td colspan="5" class="muted text-center">None</td></tr>'}</tbody></table></div><h6>Sign-in history</h6><div class="tbl-wrap"><table class="fb-table"><thead><tr><th>When</th><th>Result</th><th>IP</th><th>Device</th><th>Note</th></tr></thead><tbody>${r.history.map(x => `<tr><td>${fmtDateTime(x.created_at)}</td><td>${x.success ? pill('ok', 'success') : pill('failed', 'danger')}</td><td><code>${esc(x.ip || '')}</code></td><td class="small">${esc(String(x.user_agent || '').slice(0, 50))}</td><td>${esc(x.note || '')}</td></tr>`).join('') || '<tr><td colspan="5" class="muted text-center">None</td></tr>'}</tbody></table></div>`; }
+        catch (e) { m.close(); fail(e); }
+      });
+    };
+    await load();
+  }
+});
+
+/* Overview: add a "details" shortcut per business (health snapshot from /developer/businesses/:id/stats) */
+const baseOverview = views.overview;
+views.overview = async function (el, ctx) {
+  await baseOverview(el, ctx);
+  el.querySelectorAll('[data-open]').forEach(btn => {
+    if (btn.parentElement.querySelector('[data-stats]')) return;
+    const b = document.createElement('button'); b.className = 'btn btn-sm btn-soft ms-1'; b.dataset.stats = btn.dataset.open; b.title = 'Activity snapshot'; b.innerHTML = '<i class="bi bi-activity"></i>';
+    b.onclick = async e => { e.stopPropagation(); try { const s = await get(`/developer/businesses/${b.dataset.stats}/stats`); const m = openModal({ size: 'modal-sm', title: 'Activity snapshot', body: [['Sales · 30 days', num(s.sales_30d)], ['Active users · 7 days', num(s.active_users_7d)], ['Last sale', s.last_sale ? ago(s.last_sale) : 'never'], ['Customers', num(s.customers)], ['Suppliers', num(s.suppliers)], ['API requests · 24h', num(s.api_24h)], ['AI questions · 24h', num(s.ai_24h)], ['Unread alerts', num(s.unread_alerts)]].map(([l, v]) => `<div class="d-flex justify-content-between py-1 border-bottom"><span class="muted">${l}</span><b>${v}</b></div>`).join('') }); void m; } catch (err) { fail(err); } };
+    btn.insertAdjacentElement('afterend', b);
+  });
 };

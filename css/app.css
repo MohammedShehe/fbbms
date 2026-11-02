@@ -164,3 +164,43 @@ h1,h2,h3,h4,h5{font-weight:700;letter-spacing:-.01em}
 @keyframes drift{to{transform:translate(40px,30px) scale(1.15)}}
 .otp-inputs{display:flex;gap:8px;justify-content:center}.otp-inputs input{width:48px;height:56px;text-align:center;font-size:1.4rem;font-weight:700;border-radius:12px;background:var(--surface2);border:1px solid var(--border2);color:var(--text)}.otp-inputs input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 .2rem color-mix(in srgb,var(--primary) 25%,transparent)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- refined authentication experience ---------- */
+.auth{padding:clamp(18px,4vw,48px);isolation:isolate}
+.auth-card{width:min(470px,100%);padding:clamp(28px,5vw,44px);border-radius:28px;background:linear-gradient(155deg,color-mix(in srgb,var(--surface) 96%,var(--primary) 4%),var(--surface));border-color:color-mix(in srgb,var(--primary) 24%,var(--border2));box-shadow:0 28px 90px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.055);animation:authEnter .55s cubic-bezier(.2,.75,.25,1) both}
+@keyframes authEnter{from{opacity:0;transform:translateY(16px) scale(.99)}to{opacity:1;transform:none}}
+.auth-kicker{display:flex;justify-content:center;align-items:center;gap:9px;color:var(--muted);font-size:.64rem;font-weight:800;letter-spacing:.19em;margin-bottom:26px}
+.auth-kicker-dot{width:7px;height:7px;border-radius:50%;background:var(--success);box-shadow:0 0 12px color-mix(in srgb,var(--success) 65%,transparent)}
+.auth-card .brand-sub{letter-spacing:.16em;font-size:.66rem}
+.auth-trust{display:flex;justify-content:center;align-items:center;gap:8px;margin-top:14px;color:var(--muted);font-size:.73rem}
+.auth-trust i{color:var(--success)}
+.auth-card #loginHello{line-height:1.65;margin-top:28px!important}
+.auth-card .form-label{font-size:.78rem;font-weight:700;color:var(--text);margin-bottom:8px}
+.auth-card .form-control{min-height:52px;border-radius:13px;background:var(--bg2);border-color:var(--border2);font-size:.92rem;transition:border-color .2s,box-shadow .2s}
+.auth-card .form-control:focus{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 17%,transparent)}
+.auth-card .btn-fb{min-height:52px;border-radius:13px;font-weight:750;letter-spacing:.01em;box-shadow:0 8px 24px color-mix(in srgb,var(--primary) 16%,transparent);transition:transform .2s,filter .2s}
+.auth-card .btn-fb:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.07)}
+.auth-card button:disabled{cursor:wait;opacity:.78}
+.auth-card .alert-fb{border-radius:12px}
+.auth-card #eye{height:42px;width:44px;right:5px!important;border:0}
+.auth-card #eye:focus-visible,.auth-card a:focus-visible,.auth-card button:focus-visible{outline:2px solid var(--primary);outline-offset:3px}
+.auth-card .small a{font-weight:650}
+.auth-card .small a[aria-disabled=true]{pointer-events:none;opacity:.6}
+@media(max-width:420px){.auth-card{padding:26px 20px;border-radius:22px}.auth-kicker{font-size:.57rem;letter-spacing:.14em}}
+@media(prefers-reduced-motion:reduce){.auth-card{animation:none}}
+
+/* Application boot, loading and empty-state consistency */
+.boot-screen{position:fixed;inset:0;z-index:3000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:28px;text-align:center;background:var(--bg);color:var(--text)}
+.boot-mark{width:78px;height:78px;display:grid;place-items:center;border-radius:22px;background:var(--surface);border:1px solid var(--border);margin-bottom:8px}
+.boot-mark img{width:62px;height:62px;object-fit:contain}
+.boot-spinner{width:30px;height:30px;border:3px solid var(--border2);border-top-color:var(--primary);border-radius:50%;animation:bootSpin .8s linear infinite}
+@keyframes bootSpin{to{transform:rotate(360deg)}}
+.boot-screen strong{font-size:1rem}.boot-screen>span{font-size:.84rem;color:var(--muted);max-width:340px;line-height:1.6}
+button[aria-busy=true]{cursor:wait!important;opacity:.78}
+button[aria-busy=true] .spinner-border{vertical-align:-.12em}
+.empty{padding:34px 22px;border:1px dashed var(--border2);border-radius:16px;text-align:center;color:var(--muted);background:var(--surface)}
+.empty>i{display:block;font-size:1.8rem;color:var(--primary);margin-bottom:10px}
+.skeleton{border-radius:13px;position:relative;overflow:hidden;background:var(--surface2)}
+.skeleton:after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--text) 6%,transparent),transparent);animation:skeletonSweep 1.4s infinite}
+@keyframes skeletonSweep{to{transform:translateX(100%)}}
+@media(prefers-reduced-motion:reduce){.boot-spinner,.skeleton:after{animation:none}}

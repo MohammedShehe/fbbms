@@ -1,6 +1,6 @@
 import { api, get, post, put, session, streamUrl } from './api.js';
-import { $, $$, esc, setCurrency, applyTheme, toast, fail, ok, openModal, initials, ago, money, fmtDate } from './ui.js';
-import { TZ, BIZ_LOGOS, DEFAULT_LOGO } from './config.js';
+import { $, $$, esc, setCurrency, setRegion, getTz, applyTheme, toast, fail, ok, openModal, initials, ago, money, fmtDate } from './ui.js';
+import { BIZ_LOGOS, DEFAULT_LOGO } from './config.js';
 
 if (!session.token) location.replace('index.html');
 
@@ -10,37 +10,54 @@ const NAV = [
   { id: 'pos', label: 'New sale', icon: 'bi-bag-plus-fill', perm: 'sales.create' },
   { group: 'Sell' },
   { id: 'sales', label: 'Sales', icon: 'bi-receipt', any: ['sales.create', 'sales.view_all'] },
+  { id: 'refunds', label: 'Refunds & exchanges', icon: 'bi-arrow-return-left', mod: 'refunds', any: ['sales.refund', 'sales.view_all'] },
+  { id: 'customers', label: 'Customers', icon: 'bi-people', mod: 'customers', any: ['customers.view', 'customers.manage', 'reports.view'] },
   { id: 'orders', label: 'Website orders', icon: 'bi-globe2', perm: 'orders.view', badge: true },
   { group: 'Inventory' },
   { id: 'products', label: 'Products', icon: 'bi-box-seam-fill', any: ['products.view', 'products.manage'] },
   { id: 'stock', label: 'Stock ledger', icon: 'bi-clipboard2-data-fill', perm: 'stock.adjust' },
+  { id: 'suppliers', label: 'Suppliers & purchases', icon: 'bi-truck', mod: 'suppliers', perm: 'suppliers.manage' },
   { group: 'Money' },
   { id: 'expenses', label: 'Expenses', icon: 'bi-wallet2', perm: 'expenses.manage' },
+  { id: 'cash', label: 'Cash & till', icon: 'bi-safe2', mod: 'cash', perm: 'cash.manage' },
+  { id: 'finance', label: 'Finance & tax', icon: 'bi-bank2', mod: 'finance', perm: 'reports.view' },
   { id: 'reports', label: 'Reports', icon: 'bi-graph-up-arrow', perm: 'reports.view' },
+  { group: 'Intelligence' },
+  { id: 'health', label: 'Business health', icon: 'bi-heart-pulse-fill', mod: 'health', any: ['health.view', 'reports.view'] },
+  { id: 'alerts', label: 'Alerts', icon: 'bi-bell-fill', mod: 'alerts', alerts: true },
+  { id: 'assistant', label: 'AI assistant', icon: 'bi-stars', mod: 'ai', perm: 'ai.use' },
   { group: 'Manage' },
   { id: 'team', label: 'Team & access', icon: 'bi-people-fill', superOnly: true },
   { id: 'audit', label: 'Audit trail', icon: 'bi-shield-check', superOnly: true },
+  { id: 'integrations', label: 'API & webhooks', icon: 'bi-plug-fill', mod: 'public_api', superOnly: true },
+  { id: 'branches', label: 'Branches', icon: 'bi-diagram-3-fill', mod: '_group', superOnly: true },
   { id: 'settings', label: 'Shop & website', icon: 'bi-sliders', superOnly: true },
   { group: 'Platform', dev: true },
   { id: 'dev-overview', label: 'Developer console', icon: 'bi-cpu-fill', dev: true },
   { id: 'dev-businesses', label: 'Businesses', icon: 'bi-shop-window', dev: true },
   { id: 'dev-users', label: 'All users', icon: 'bi-person-lines-fill', dev: true },
+  { id: 'dev-ai', label: 'AI settings', icon: 'bi-robot', dev: true },
+  { id: 'dev-modules', label: 'Feature modules', icon: 'bi-toggles', dev: true },
+  { id: 'dev-api', label: 'API & integrations', icon: 'bi-plug', dev: true },
+  { id: 'dev-system', label: 'System & backups', icon: 'bi-hdd-stack-fill', dev: true },
+  { id: 'dev-security', label: 'Security & sessions', icon: 'bi-shield-lock-fill', dev: true },
   { id: 'dev-theme', label: 'Platform theme', icon: 'bi-palette-fill', dev: true },
   { id: 'dev-audit', label: 'Global audit', icon: 'bi-journal-text', dev: true }
 ];
 
 export const ctx = {
-  profile: null, biz: null, role: null, perms: new Set(), isDev: false, isSuper: false, listeners: new Map(), badge: 0, notifs: [], unread: 0,
+  profile: null, biz: null, role: null, perms: new Set(), isDev: false, isSuper: false, listeners: new Map(), badge: 0, alerts: 0, notifs: [], unread: 0,
   can(p) { return this.isSuper || this.perms.has(p); },
   canAny(a) { return a.some(p => this.can(p)); },
   on(ev, fn) { if (!this.listeners.has(ev)) this.listeners.set(ev, new Set()); this.listeners.get(ev).add(fn); this._scoped.push([ev, fn]); },
   _scoped: [],
   emit(ev, d) { (this.listeners.get(ev) || []).forEach(fn => { try { fn(d); } catch (e) { console.error(e); } }); (this.listeners.get('*') || []).forEach(fn => fn(ev, d)); },
   go(id) { location.hash = '#/' + id; },
-  async refreshBadge() { if (!this.biz || !this.can('orders.view')) return; try { const r = await get('/b/orders', { status: 'new', limit: 1 }); this.badge = r.total; renderNav(); } catch { /* ignore */ } }
+  async refreshBadge() { if (!this.biz) return; try { if (this.can('orders.view')) { const r = await get('/b/orders', { status: 'new', limit: 1 }); this.badge = r.total; } if (this.biz.modules && this.biz.modules.alerts) { const a = await get('/b/notifications', { unread: 1, limit: 1 }); this.alerts = a.unread ?? a.unread_count ?? 0; } renderNav(); } catch { /* ignore */ } }
 };
 
-const allowed = n => n.group ? true : n.dev ? ctx.isDev : n.superOnly ? ctx.isSuper : n.perm ? ctx.can(n.perm) : n.any ? ctx.canAny(n.any) : true;
+const modOn = n => !n.mod || n.dev || !ctx.biz || (n.mod === '_group' ? !!ctx.biz.group_id : ctx.biz.modules ? ctx.biz.modules[n.mod] !== false : true);
+const allowed = n => n.group ? true : !modOn(n) ? false : n.dev ? ctx.isDev : n.superOnly ? ctx.isSuper : n.perm ? ctx.can(n.perm) : n.any ? ctx.canAny(n.any) : true;
 const needsBiz = id => !id.startsWith('dev-');
 
 /* ---------------- boot ---------------- */
@@ -52,9 +69,9 @@ const needsBiz = id => !id.startsWith('dev-');
     if (!ids.includes(session.biz)) session.biz = ids[0] || null;
     if (!ids.length && !ctx.isDev) { document.body.innerHTML = '<div class="auth"><div class="auth-card text-center"><h4>No business assigned</h4><p class="muted">Your account is not linked to any shop yet. Ask your Super Admin or the Developer to add you.</p><button class="btn btn-fb" onclick="localStorage.clear();location.href=\'index.html\'">Sign out</button></div></div>'; return; }
     await selectBusiness(session.biz, true);
-    $('#app').style.visibility = 'visible';
+    $('#app').style.visibility = 'visible'; const splash = $('#bootScreen'); if (splash) splash.remove();
     if (profile.must_change_password) forcePasswordChange();
-  } catch (e) { fail(e); }
+  } catch (e) { const splash = $('#bootScreen'); if (splash) { splash.innerHTML = `<div class="boot-mark"><img src="assets/fbbms-logo.svg" alt=""></div><i class="bi bi-wifi-off" style="font-size:1.6rem;color:var(--danger)"></i><strong>Unable to load workspace</strong><span>${esc(e.message || 'Please check your connection and try again.')}</span><button class="btn btn-fb mt-2" onclick="location.reload()">Try again</button><a href="index.html" class="small mt-2">Return to sign in</a>`; } fail(e); }
 })();
 
 async function selectBusiness(id, first = false) {
@@ -62,7 +79,8 @@ async function selectBusiness(id, first = false) {
   if (id) {
     const m = ctx.profile.memberships.find(x => x.business.id === id);
     ctx.biz = await get('/b/business'); ctx.role = ctx.biz.role; ctx.perms = new Set(ctx.biz.permissions); ctx.isSuper = ctx.role === 'super_admin';
-    setCurrency(ctx.biz.currency);
+    setCurrency(ctx.biz.currency); setRegion({ timezone: ctx.biz.timezone || ctx.biz.settings.timezone, date_format: ctx.biz.settings.date_format }); ctx.tz = getTz(); ctx.fmtCfg = { tz: ctx.tz, date_format: ctx.biz.settings.date_format || 'DD/MM/YYYY' };
+    { const t = document.getElementById('tzNote'); if (t) t.textContent = ctx.tz.replace(/_/g, ' '); }
     ctx.logo = BIZ_LOGOS[ctx.biz.slug] || DEFAULT_LOGO;
     ctx.fullLogo = ctx.biz.slug === 'zanlux' ? 'assets/zanlux-logo.png' : null;
     applyBrand();
@@ -86,7 +104,7 @@ function renderBrand() {
   const b = ctx.biz;
   const logoSrc = b ? ctx.logo : DEFAULT_LOGO;
   const w = b && b.slug === 'zanlux' ? 120 : 84;
-  $('#brand').innerHTML = `<div class="logo-anim glow" style="width:${w}px;--logo-mask:url(${logoSrc})"><img src="${logoSrc}" alt="${esc(b ? b.short_name : 'FBBMS')}"></div>
+  $('#brand').innerHTML = `<div class="logo-anim glow" style="width:${w}px;--logo-mask:url(${new URL(logoSrc, location.href).href})"><img src="${logoSrc}" alt="${esc(b ? b.short_name : 'FBBMS')}"></div>
     <div><div class="brand-name">${esc(b ? b.short_name : 'FBBMS')}</div><div class="brand-sub">${esc(b ? (b.tagline || 'Management') : 'Developer console')}</div></div>`;
 }
 
@@ -116,7 +134,7 @@ function renderNav() {
   if (ctx.biz && ctx.isDev) out.push({ group: 'Platform' }, { id: 'dev-overview', label: 'Developer console', icon: 'bi-cpu-fill', jump: true });
   const cur = currentId();
   $('#nav').innerHTML = out.map(n => n.group ? `<div class="nav-group">${n.group}</div>` :
-    `<a class="nav-item ${n.id === cur ? 'active' : ''}" href="#/${n.id}" data-id="${n.id}"><i class="bi ${n.icon}"></i><span>${n.label}</span>${n.badge && ctx.badge ? `<span class="badge-dot">${ctx.badge}</span>` : ''}</a>`).join('');
+    `<a class="nav-item ${n.id === cur ? 'active' : ''}" href="#/${n.id}" data-id="${n.id}"><i class="bi ${n.icon}"></i><span>${n.label}</span>${n.badge && ctx.badge ? `<span class="badge-dot">${ctx.badge}</span>` : ''}${n.alerts && ctx.alerts ? `<span class="badge-dot">${ctx.alerts}</span>` : ''}</a>`).join('');
   // bottom nav (mobile): up to 4 main + menu
   const main = out.filter(n => !n.group && !n.jump && ['dashboard', 'pos', 'sales', 'orders', 'products', 'dev-overview', 'dev-businesses'].includes(n.id)).slice(0, 4);
   $('#bottomNav').innerHTML = main.map(n => `<a href="#/${n.id}" class="${n.id === cur ? 'active' : ''}"><i class="bi ${n.icon}"></i>${n.label.split(' ')[0]}${n.badge && ctx.badge ? `<span class="badge-dot" style="position:absolute;top:2px;right:22%">${ctx.badge}</span>` : ''}</a>`).join('') + `<a href="#" id="bnMore"><i class="bi bi-grid-3x3-gap"></i>More</a>`;
@@ -155,7 +173,7 @@ function openStream() {
   es = new EventSource(streamUrl());
   es.addEventListener('hello', () => setLive(true));
   es.onerror = () => setLive(false);
-  const evs = ['sale.new', 'sale.voided', 'order.new', 'order.updated', 'product.changed', 'stock.low', 'expense.new', 'settings.changed'];
+  const evs = ['notification', 'sale.new', 'sale.voided', 'order.new', 'order.updated', 'product.changed', 'stock.low', 'expense.new', 'settings.changed'];
   evs.forEach(ev => es.addEventListener(ev, m => { let d = {}; try { d = JSON.parse(m.data); } catch (_) {} onLive(ev, d); }));
 }
 function beep() { try { const a = new (window.AudioContext || window.webkitAudioContext)(); const o = a.createOscillator(), g = a.createGain(); o.connect(g); g.connect(a.destination); o.type = 'sine'; o.frequency.value = 880; g.gain.setValueAtTime(.001, a.currentTime); g.gain.exponentialRampToValueAtTime(.2, a.currentTime + .02); g.gain.exponentialRampToValueAtTime(.001, a.currentTime + .5); o.start(); o.stop(a.currentTime + .5); } catch (_) {} }
@@ -166,6 +184,7 @@ function onLive(ev, d) {
   else if (ev === 'sale.new' && !mine && ctx.can('reports.view')) { toast('success', '💰 Sale recorded', `${d.receipt_no} · ${money(d.total)} by ${d.by}`); notify('bi-receipt', 'Sale recorded', `${d.receipt_no} · ${money(d.total)} by ${d.by}`); }
   else if (ev === 'sale.voided' && ctx.isSuper) { toast('warn', 'Sale voided', `${d.receipt_no} (${money(d.total)}) by ${d.by}`, 8000); notify('bi-x-octagon', 'Sale voided', `${d.receipt_no} · ${money(d.total)} by ${d.by}`, 'warn'); }
   else if (ev === 'stock.low' && ctx.can('products.view')) { toast('warn', 'Low stock', `${d.name}: ${d.stock_qty} left`); notify('bi-exclamation-triangle', 'Low stock', `${d.name}: ${d.stock_qty} left`, 'warn'); }
+  else if (ev === 'notification') { const k = d.severity === 'critical' ? 'error' : d.severity === 'warn' ? 'warn' : 'info'; if (d.severity !== 'info') toast(k, d.title, d.body || '', 8000); notify('bi-bell', d.title, d.body || '', d.severity === 'info' ? 'info' : 'warn'); ctx.alerts++; renderNav(); }
   else if (ev === 'order.updated') ctx.refreshBadge();
   else if (ev === 'settings.changed') get('/b/business').then(b => { ctx.biz = b; applyBrand(); });
   ctx.emit(ev, d);
@@ -182,8 +201,8 @@ renderBell();
 /* ---------------- clock, theme, menu ---------------- */
 function tick() {
   const n = new Date();
-  $('#clockT').textContent = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).format(n);
-  $('#clockD').textContent = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long' }).format(n);
+  $('#clockT').textContent = new Intl.DateTimeFormat('en-GB', { timeZone: getTz(), hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).format(n);
+  $('#clockD').textContent = new Intl.DateTimeFormat('en-GB', { timeZone: getTz(), weekday: 'long', day: 'numeric', month: 'long' }).format(n);
 }
 tick(); setInterval(tick, 1000);
 $('#themeBtn').onclick = () => { const m = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; localStorage.setItem('fbbms_mode', m); applyBrand(); ctx.emit('theme'); };

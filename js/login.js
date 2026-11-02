@@ -7,12 +7,12 @@ if (new URLSearchParams(location.search).has('expired')) showErr('Your session e
 
 api('/auth/theme', { auth: false }).then(t => { applyTheme(t); $('#platName').textContent = t.name || 'FBBMS'; }).catch(() => {});
 
-function showErr(m, n = '') { const b = $('#err' + n); $('#errText' + n).textContent = m; b.classList.remove('d-none'); }
+function showErr(m, n = '') { const b = $('#err' + n); $('#errText' + n).textContent = m; b.classList.remove('d-none'); b.setAttribute('role','alert'); }
 function hideErr() { $('#err').classList.add('d-none'); $('#err2').classList.add('d-none'); }
-function busy(btn, on) { btn.disabled = on; btn.querySelector('.label').innerHTML = on ? '<span class="spinner-border spinner-border-sm me-2"></span>Please wait…' : btn.dataset.label; }
+function busy(btn, on) { btn.disabled = on; btn.setAttribute('aria-busy', String(on)); btn.classList.toggle('is-loading', on); btn.querySelector('.label').innerHTML = on ? '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span><span>Please wait…</span>' : btn.dataset.label; }
 ['loginBtn', 'otpBtn'].forEach(id => { const b = $('#' + id); b.dataset.label = b.querySelector('.label').textContent; });
 
-$('#eye').onclick = () => { const p = $('#pw'); const s = p.type === 'password'; p.type = s ? 'text' : 'password'; $('#eye i').className = 'bi ' + (s ? 'bi-eye-slash' : 'bi-eye'); };
+$('#eye').onclick = () => { const p = $('#pw'); const s = p.type === 'password'; p.type = s ? 'text' : 'password'; $('#eye i').className = 'bi ' + (s ? 'bi-eye-slash' : 'bi-eye'); $('#eye').setAttribute('aria-label', s ? 'Hide password' : 'Show password'); $('#eye').setAttribute('aria-pressed', String(s)); };
 
 let challenge = null;
 async function finish(res) {
@@ -54,6 +54,7 @@ $('#backLink').onclick = e => { e.preventDefault(); $('#stepOtp').classList.add(
 let cool = 0;
 $('#resend').onclick = async e => {
   e.preventDefault(); if (cool) return;
+  const link = $('#resend'); link.classList.add('is-loading'); link.setAttribute('aria-disabled','true');
   try { const r = await api('/auth/resend-otp', { method: 'POST', body: { challenge }, auth: false }); challenge = r.challenge; cool = 30; const t = setInterval(() => { cool--; $('#resend').textContent = cool ? `Resend in ${cool}s` : 'Resend code'; if (!cool) clearInterval(t); }, 1000); }
-  catch (err) { showErr(err.message, '2'); }
+  catch (err) { showErr(err.message, '2'); } finally { $('#resend').classList.remove('is-loading'); $('#resend').removeAttribute('aria-disabled'); }
 };

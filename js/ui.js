@@ -1,4 +1,9 @@
-import { TZ } from './config.js';
+import { TZ as DEFAULT_TZ } from './config.js';
+
+/* Regional settings come from the business (timezone, date format). Set once after the business loads. */
+let TZ = DEFAULT_TZ, DFMT = 'DD/MM/YYYY';
+export const setRegion = ({ timezone, date_format } = {}) => { if (timezone) { try { new Intl.DateTimeFormat('en', { timeZone: timezone }); TZ = timezone; } catch (_) { /* keep */ } } if (date_format) DFMT = date_format; };
+export const getTz = () => TZ;
 
 export const $ = (s, r = document) => r.querySelector(s);
 export const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -12,11 +17,13 @@ export const money = n => `${CUR} ${num(n)}`;
 export const compact = n => Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(n || 0));
 export const pct = (a, b) => b ? ((a - b) / b * 100) : (a > 0 ? 100 : 0);
 
-const asDate = v => (v instanceof Date ? v : new Date(typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v + 'T12:00:00+03:00' : v));
-export const fmtDate = v => v ? new Intl.DateTimeFormat('en-GB', { timeZone: TZ, day: '2-digit', month: 'short', year: 'numeric' }).format(asDate(v)) : '—';
+const isDay = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+const asDate = v => (v instanceof Date ? v : new Date(isDay(v) ? v + 'T12:00:00Z' : v));
+// plain dates (YYYY-MM-DD) are calendar days: never shifted by timezone
+export const fmtDate = v => { if (!v) return '—'; const d = asDate(v); const tz = isDay(v) ? 'UTC' : TZ; if (DFMT === 'YYYY-MM-DD') return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(d); if (DFMT === 'MM/DD/YYYY') return new Intl.DateTimeFormat('en-US', { timeZone: tz, day: '2-digit', month: '2-digit', year: 'numeric' }).format(d); return new Intl.DateTimeFormat('en-GB', { timeZone: tz, day: '2-digit', month: 'short', year: 'numeric' }).format(d); };
 export const fmtTime = v => v ? new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: true }).format(asDate(v)) : '';
 export const fmtDateTime = v => v ? `${fmtDate(v)}, ${fmtTime(v)}` : '—';
-export const shortDay = v => new Intl.DateTimeFormat('en-GB', { timeZone: TZ, day: 'numeric', month: 'short' }).format(asDate(v));
+export const shortDay = v => new Intl.DateTimeFormat('en-GB', { timeZone: isDay(v) ? 'UTC' : TZ, day: 'numeric', month: 'short' }).format(asDate(v));
 export const todayEAT = () => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date());
 export const addDays = (ds, n) => { const d = new Date(ds + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 export const eatHour = () => Number(new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', hour12: false }).format(new Date())) % 24;
