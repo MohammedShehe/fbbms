@@ -11,44 +11,142 @@
 <link rel="icon" href="assets/favicon.png" type="image/png">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/login-animated.css">
 </head>
-<body>
-<div class="orb a"></div><div class="orb b"></div>
-<main class="auth">
-  <div class="auth-card">
-    <div class="auth-kicker"><span class="auth-kicker-dot"></span> FOUR BROTHERS · BUSINESS PLATFORM</div>
-    <div class="text-center mb-3">
-      <div class="logo-anim glow" style="width:92px;--logo-mask:url(assets/fbbms-logo.svg)"><img src="assets/fbbms-logo.svg" alt="FBBMS"></div>
-      <h1 class="h4 mt-3 mb-0" style="font-family:var(--font-display)" id="platName">FBBMS</h1>
-      <div class="brand-sub">Four Brothers Business Management</div>
-      <div class="auth-trust"><i class="bi bi-shield-lock-fill"></i> Secure workspace <span>·</span> Multi-business access</div>
-    </div>
+<body class="lx">
 
-    <div id="stepLogin">
-      <p class="text-center muted mb-3" id="loginHello">Welcome back. Sign in to continue to your business workspace.</p>
-      <div class="alert-fb bad mb-3 d-none" id="err"><i class="bi bi-exclamation-circle"></i><span id="errText"></span></div>
-      <form id="loginForm" novalidate>
-        <div class="mb-3"><label class="form-label" for="email">Email</label><input id="email" type="email" class="form-control form-control-lg" autocomplete="username" placeholder="you@business.online" required></div>
-        <div class="mb-3"><label class="form-label" for="pw">Password</label>
-          <div class="position-relative"><input id="pw" type="password" class="form-control form-control-lg pe-5" autocomplete="current-password" placeholder="••••••••" required>
-          <button type="button" class="btn position-absolute top-50 end-0 translate-middle-y text-muted" id="eye" aria-label="Show password" aria-pressed="false"><i class="bi bi-eye"></i></button></div></div>
-        <button class="btn btn-fb btn-lg w-100" id="loginBtn" type="submit"><span class="label">Sign in</span></button>
-      </form>
-    </div>
+<!-- ambient background: drifting colour fields + a dot grid that lights up under the pointer -->
+<div class="lx-bg" aria-hidden="true">
+  <span class="lx-blob b1"></span><span class="lx-blob b2"></span><span class="lx-blob b3"></span>
+  <span class="lx-grid"></span><span class="lx-grid hot"></span>
+</div>
+<div class="lx-wipe" aria-hidden="true"></div>
 
-    <div id="stepOtp" class="d-none">
-      <p class="text-center muted">We sent a 6-digit code to <b id="otpEmail"></b>. Enter it below 🔐</p>
-      <div class="alert-fb bad mb-3 d-none" id="err2"><i class="bi bi-exclamation-circle"></i><span id="errText2"></span></div>
-      <div class="otp-inputs mb-3" id="otpBoxes"></div>
-      <button class="btn btn-fb btn-lg w-100" id="otpBtn"><span class="label">Verify & continue</span></button>
-      <div class="d-flex justify-content-between mt-3 small"><a href="#" id="backLink">← Back</a><a href="#" id="resend">Resend code</a></div>
-    </div>
+<main class="lx-wrap">
+  <div class="lx-shell" id="shell">
 
-    <p class="text-center muted small mt-4 mb-0">Protected access · Your account activity is secured.<br>© <span id="yr"></span> Four Brothers · <a href="about.html">About FBBMS</a></p>
+    <!-- ───────────── LEFT: live business floor ───────────── -->
+    <section class="lx-stage" aria-label="Platform preview">
+      <div class="lx-scan" aria-hidden="true"></div>
+
+      <header class="lx-brand">
+        <span class="lx-mark"><img src="assets/fbbms-logo.svg" alt=""></span>
+        <span class="lx-brand-t"><b id="platName">FBBMS</b><small>Four Brothers Business Management</small></span>
+      </header>
+
+      <div class="lx-copy">
+        <h2>Every till, shelf and branch in one live view.</h2>
+        <p>Sales, stock, cash and reports for each business you run, updating the moment something happens.</p>
+      </div>
+
+      <!-- floating cards (desktop) -->
+      <div class="lx-cards" aria-hidden="true">
+        <div class="lx-card c-rev" data-depth="16" style="--i:0;--r:-5deg"><div class="lx-card-in">
+          <div class="lx-card-h"><span>Today's sales</span><em class="lx-delta" id="fxDelta"><i class="bi bi-arrow-up-right"></i> 12.4%</em></div>
+          <div class="lx-big"><small>TZS</small><b id="fxTotal">0</b></div>
+          <svg class="lx-spark" viewBox="0 0 258 62" width="100%" height="62">
+            <defs><linearGradient id="fxG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#18E0A6" stop-opacity=".38"/><stop offset="1" stop-color="#18E0A6" stop-opacity="0"/></linearGradient></defs>
+            <path id="fxArea" fill="url(#fxG)"/>
+            <path id="fxLine" fill="none" stroke="#18E0A6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle id="fxPulse" class="lx-pulse" r="4" fill="#18E0A6"/><circle id="fxDot" r="3.2" fill="#fff"/>
+          </svg>
+          <div class="lx-card-f"><b id="fxCount">126</b> orders so far today</div>
+        </div></div>
+
+        <div class="lx-card c-stock" data-depth="30" style="--i:1;--r:4deg"><div class="lx-card-in">
+          <div class="lx-card-h"><span>Stock levels</span><i class="bi bi-box-seam"></i></div>
+          <ul class="lx-stock" id="fxStock"></ul>
+        </div></div>
+
+        <div class="lx-card c-ord" data-depth="22" style="--i:2;--r:-3deg"><div class="lx-card-in">
+          <div class="lx-card-h"><span>Orders coming in</span><span class="lx-live"><i></i>Live</span></div>
+          <ul class="lx-orders" id="fxOrders"></ul>
+        </div></div>
+
+        <div class="lx-card c-br" data-depth="38" style="--i:3;--r:5deg"><div class="lx-card-in">
+          <div class="lx-card-h"><span>Branches online</span></div>
+          <div class="lx-br">
+            <span><i style="--c:var(--lx-em)"></i>Scents</span>
+            <span><i style="--c:var(--lx-vi);animation-delay:-.6s"></i>Sports</span>
+            <span><i style="--c:var(--lx-am);animation-delay:-1.2s"></i>Online</span>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- compact KPI marquee (mobile / tablet) -->
+      <div class="lx-strip" aria-hidden="true"><div class="lx-strip-in">
+        <span class="lx-chip"><i class="bi bi-graph-up-arrow"></i>Sales today <b>TZS 4.8M</b></span>
+        <span class="lx-chip"><i class="bi bi-receipt"></i>Orders <b>126</b></span>
+        <span class="lx-chip"><i class="bi bi-box-seam"></i>Low stock <b>3 items</b></span>
+        <span class="lx-chip"><i class="bi bi-shop"></i>Branches <b>3 online</b></span>
+        <span class="lx-chip"><i class="bi bi-graph-up-arrow"></i>Sales today <b>TZS 4.8M</b></span>
+        <span class="lx-chip"><i class="bi bi-receipt"></i>Orders <b>126</b></span>
+        <span class="lx-chip"><i class="bi bi-box-seam"></i>Low stock <b>3 items</b></span>
+        <span class="lx-chip"><i class="bi bi-shop"></i>Branches <b>3 online</b></span>
+      </div></div>
+
+      <p class="lx-note">Preview shows sample figures.</p>
+    </section>
+
+    <!-- ───────────── RIGHT: sign-in ───────────── -->
+    <section class="lx-panel">
+
+      <div id="stepLogin" class="lx-step">
+        <h1 class="lx-h">Welcome back</h1>
+        <p class="lx-sub" id="loginHello">Sign in to continue to your business workspace.</p>
+
+        <div class="lx-alert d-none" id="err"><i class="bi bi-exclamation-circle"></i><span id="errText"></span></div>
+
+        <form id="loginForm" novalidate>
+          <div class="lx-field" style="--d:0">
+            <i class="bi bi-envelope lx-ico"></i>
+            <input id="email" type="email" autocomplete="username" placeholder=" " required>
+            <label for="email">Email address</label>
+            <span class="lx-glow"></span>
+          </div>
+          <div class="lx-field" style="--d:1">
+            <i class="bi bi-lock lx-ico"></i>
+            <input id="pw" type="password" autocomplete="current-password" placeholder=" " required>
+            <label for="pw">Password</label>
+            <button type="button" class="lx-eye" id="eye" aria-label="Show password" aria-pressed="false"><i class="bi bi-eye"></i></button>
+            <span class="lx-glow"></span>
+          </div>
+          <div class="lx-caps d-none" id="caps"><i class="bi bi-capslock"></i> Caps Lock is on</div>
+
+          <button class="lx-btn" id="loginBtn" type="submit"><span class="fill"></span><span class="label">Sign in</span></button>
+        </form>
+
+        <ul class="lx-assure">
+          <li><i class="bi bi-shield-lock-fill"></i>Encrypted sign-in</li>
+          <li><i class="bi bi-buildings-fill"></i>Multi-business access</li>
+        </ul>
+      </div>
+
+      <div id="stepOtp" class="lx-step d-none">
+        <span class="lx-otp-ico"><i class="bi bi-shield-lock-fill"></i></span>
+        <h1 class="lx-h">Check your email</h1>
+        <p class="lx-sub">We sent a 6-digit code to <b id="otpEmail"></b>. Enter it below to continue.</p>
+        <div class="lx-alert d-none" id="err2"><i class="bi bi-exclamation-circle"></i><span id="errText2"></span></div>
+        <div class="lx-otp" id="otpBoxes"></div>
+        <button class="lx-btn" id="otpBtn" type="button"><span class="fill"></span><span class="label">Verify &amp; continue</span></button>
+        <div class="lx-links"><a href="#" id="backLink"><i class="bi bi-arrow-left"></i> Back</a><a href="#" id="resend">Resend code</a></div>
+      </div>
+
+      <!-- success overlay -->
+      <div class="lx-unlock" id="unlock" aria-hidden="true">
+        <svg viewBox="0 0 80 80" width="92" height="92"><circle class="ring" cx="40" cy="40" r="34"/><path class="tick" d="M25 41l11 11 20-23"/></svg>
+        <h2>Access granted</h2>
+        <p>Opening your workspace</p>
+        <div class="bar"><i></i></div>
+      </div>
+    </section>
   </div>
+
+  <p class="lx-foot">Your account activity is secured. © <span id="yr"></span> Four Brothers · <a href="about.html">About FBBMS</a></p>
 </main>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script type="module" src="js/login.js"></script>
 </body>

@@ -15,3 +15,9 @@ New pages (shown only when the Developer has enabled the module and the user has
 Time zone, date format and currency come from each business's settings. Reports and lists export to Excel and PDF (SheetJS and jsPDF are loaded from a CDN only when you click Export).
 Developer console additions: AI settings, Feature modules, API & integrations, System & backups, Security & sessions.
 Integrating a public website with the API: see `backend/docs/PUBLIC_API.md`.
+
+## Animated login (index.html)
+The sign-in page is a horizontal split card: a self-updating business preview (sales, stock, orders, branches – sample data only) beside the form.
+Signing in plays a short sequence (scan beam → progress button → "Access granted" → card dissolves) before redirecting; OTP, errors and the Back/Resend flow behave exactly as before.
+Files: `index.html`, `css/login-animated.css`, `js/login-fx.js` (visual only) and `js/login.js` (auth logic + calls into the effects).
+Colours follow the business theme (`--primary`, `--accent`, light/dark). `prefers-reduced-motion` turns the motion off.
