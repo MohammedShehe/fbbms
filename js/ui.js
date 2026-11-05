@@ -1,4 +1,5 @@
-import { TZ as DEFAULT_TZ } from './config.js';
+import { TZ as DEFAULT_TZ, BIZ_LOGOS, DEFAULT_LOGO } from './config.js';
+import { loc, t } from './i18n.js';
 
 /* Regional settings come from the business (timezone, date format). Set once after the business loads. */
 let TZ = DEFAULT_TZ, DFMT = 'DD/MM/YYYY';
@@ -20,17 +21,17 @@ export const pct = (a, b) => b ? ((a - b) / b * 100) : (a > 0 ? 100 : 0);
 const isDay = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const asDate = v => (v instanceof Date ? v : new Date(isDay(v) ? v + 'T12:00:00Z' : v));
 // plain dates (YYYY-MM-DD) are calendar days: never shifted by timezone
-export const fmtDate = v => { if (!v) return '—'; const d = asDate(v); const tz = isDay(v) ? 'UTC' : TZ; if (DFMT === 'YYYY-MM-DD') return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(d); if (DFMT === 'MM/DD/YYYY') return new Intl.DateTimeFormat('en-US', { timeZone: tz, day: '2-digit', month: '2-digit', year: 'numeric' }).format(d); return new Intl.DateTimeFormat('en-GB', { timeZone: tz, day: '2-digit', month: 'short', year: 'numeric' }).format(d); };
-export const fmtTime = v => v ? new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: true }).format(asDate(v)) : '';
+export const fmtDate = v => { if (!v) return '—'; const d = asDate(v); const tz = isDay(v) ? 'UTC' : TZ; if (DFMT === 'YYYY-MM-DD') return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(d); if (DFMT === 'MM/DD/YYYY') return new Intl.DateTimeFormat('en-US', { timeZone: tz, day: '2-digit', month: '2-digit', year: 'numeric' }).format(d); return new Intl.DateTimeFormat(loc('en-GB'), { timeZone: tz, day: '2-digit', month: 'short', year: 'numeric' }).format(d); };
+export const fmtTime = v => v ? new Intl.DateTimeFormat(loc('en-GB'), { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: true }).format(asDate(v)) : '';
 export const fmtDateTime = v => v ? `${fmtDate(v)}, ${fmtTime(v)}` : '—';
-export const shortDay = v => new Intl.DateTimeFormat('en-GB', { timeZone: isDay(v) ? 'UTC' : TZ, day: 'numeric', month: 'short' }).format(asDate(v));
+export const shortDay = v => new Intl.DateTimeFormat(loc('en-GB'), { timeZone: isDay(v) ? 'UTC' : TZ, day: 'numeric', month: 'short' }).format(asDate(v));
 export const todayEAT = () => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date());
 export const addDays = (ds, n) => { const d = new Date(ds + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 export const eatHour = () => Number(new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', hour12: false }).format(new Date())) % 24;
 export const ago = v => {
   const s = Math.max(0, (Date.now() - new Date(v).getTime()) / 1000);
-  if (s < 45) return 'just now'; if (s < 3600) return Math.round(s / 60) + ' min ago'; if (s < 86400) return Math.round(s / 3600) + ' hr ago';
-  if (s < 604800) return Math.round(s / 86400) + ' d ago'; return fmtDate(v);
+  if (s < 45) return t('just now'); if (s < 3600) return t(Math.round(s / 60) + ' min ago'); if (s < 86400) return t(Math.round(s / 3600) + ' hr ago');
+  if (s < 604800) return t(Math.round(s / 86400) + ' d ago'); return fmtDate(v);
 };
 export const initials = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 export const phoneLink = p => esc(p || '');
@@ -134,3 +135,40 @@ export function chartTheme() {
   return { primary: cs.getPropertyValue('--primary').trim(), accent: cs.getPropertyValue('--accent').trim(), text: cs.getPropertyValue('--muted').trim(), grid: cs.getPropertyValue('--border').trim(), surface: cs.getPropertyValue('--surface').trim() };
 }
 export const PALETTE = ['#d4af55', '#56a8ff', '#2fd18b', '#ff7a8a', '#b07cff', '#ffb84d', '#4fd1c5', '#f472b6'];
+
+
+/* ---------- business logo ---------- */
+/** The logo to show for a business: its own uploaded logo, else a bundled emblem, else the FBBMS mark. */
+export const bizLogo = b => (b && b.theme && b.theme.logo_url) || (b && BIZ_LOGOS[b.slug]) || DEFAULT_LOGO;
+export const hasCustomLogo = b => !!(b && b.theme && b.theme.logo_url);
+
+/**
+ * Prepares a logo in the browser: checks the file, scales it down (max 600 px) and keeps transparency.
+ * PNG/WebP stay PNG (transparent background is preserved), JPEG stays JPEG. Resolves { data, width, height, bytes }.
+ */
+export function prepareLogo(file, { max = 600, minSide = 64, maxBytes = 1.8 * 1024 * 1024 } = {}) {
+  return new Promise((resolve, reject) => {
+    if (!file) return reject(new Error('Choose an image first'));
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type)) return reject(new Error('Choose a PNG, JPG or WebP image'));
+    if (file.size > 15 * 1024 * 1024) return reject(new Error('That file is too big (max 15 MB)'));
+    const img = new Image(); const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      if (Math.min(img.width, img.height) < minSide) return reject(new Error(`Image is too small (at least ${minSide}×${minSide} pixels)`));
+      const jpeg = file.type === 'image/jpeg'; let scale = Math.min(1, max / Math.max(img.width, img.height));
+      for (let i = 0; i < 6; i++) {
+        const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(img.width * scale)); c.height = Math.max(1, Math.round(img.height * scale));
+        const x = c.getContext('2d'); x.imageSmoothingQuality = 'high';
+        if (jpeg) { x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); }
+        x.drawImage(img, 0, 0, c.width, c.height);
+        const data = jpeg ? c.toDataURL('image/jpeg', 0.9) : c.toDataURL('image/png');
+        const bytes = Math.round((data.length - data.indexOf(',') - 1) * 0.75);
+        if (bytes <= maxBytes) return resolve({ data, width: c.width, height: c.height, bytes });
+        scale *= 0.75;
+      }
+      reject(new Error('Could not shrink that image enough. Try a simpler or smaller file.'));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read that image')); };
+    img.src = url;
+  });
+}

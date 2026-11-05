@@ -234,3 +234,8 @@ body.is-exit .lx-wipe{opacity:1;scale:60}
   .lx-shell,.lx-step,.lx-field,.lx-btn,.lx-brand,.lx-copy h2,.lx-copy p,.lx-assure,.lx-foot{animation:none!important}
   body.is-exit .lx-wipe{transition:none}
 }
+
+/* language toggle */
+.lx-lang{position:fixed;top:14px;right:14px;z-index:50;display:flex;align-items:center;gap:4px;padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:rgba(20,20,26,.6);color:#fff;font:600 .72rem Inter,sans-serif;backdrop-filter:blur(8px);cursor:pointer}
+.lx-lang span{opacity:.5;padding:1px 6px;border-radius:999px}.lx-lang span.on{opacity:1;background:var(--primary,#d4af55);color:#17130a}
+.lx-lang:hover{border-color:var(--primary,#d4af55)}

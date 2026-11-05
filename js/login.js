@@ -1,12 +1,18 @@
 import { api, session } from './api.js';
 import { applyTheme, $ } from './ui.js';
 import { setAuthing, stepIn, shake, playUnlock } from './login-fx.js';
+import { init as i18nInit, getLang, setResolved, resolve } from './i18n.js';
+
+i18nInit();
+document.querySelectorAll('#langBtn [data-lang]').forEach(s => s.classList.toggle('on', s.dataset.lang === getLang()));
+$('#langBtn').onclick = () => { setResolved(getLang() === 'sw' ? 'en' : 'sw'); location.reload(); };
+let platformLang = null;
 
 $('#yr').textContent = new Date().getFullYear();
 if (session.token) location.replace('app.html');
 if (new URLSearchParams(location.search).has('expired')) showErr('Your session ended. Please sign in again.');
 
-api('/auth/theme', { auth: false }).then(t => { applyTheme(t); $('#platName').textContent = t.name || 'FBBMS'; }).catch(() => {});
+api('/auth/theme', { auth: false }).then(t => { applyTheme(t); $('#platName').textContent = t.name || 'FBBMS'; platformLang = t.default_language; if (localStorage.getItem('fbbms_lang') === null && setResolved(resolve({ platform: t.default_language }))) location.reload(); }).catch(() => {});
 
 function showErr(m, n = '') { const b = $('#err' + n); $('#errText' + n).textContent = m; b.classList.remove('d-none'); b.setAttribute('role','alert'); shake(n ? $('#stepOtp') : $('#loginForm')); }
 function hideErr() { $('#err').classList.add('d-none'); $('#err2').classList.add('d-none'); }
@@ -21,6 +27,7 @@ $('#pw').addEventListener('keydown', caps); $('#pw').addEventListener('keyup', c
 let challenge = null;
 async function finish(res) {
   session.token = res.token;
+  setResolved(resolve({ personal: res.profile.language, platform: platformLang }));
   const prev = session.biz; const list = res.profile.memberships.map(m => m.business.id);
   session.biz = list.includes(prev) ? prev : (list[0] || null);
   await playUnlock();

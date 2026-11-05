@@ -1,6 +1,9 @@
 import { api, get, post, put, session, streamUrl } from './api.js';
-import { $, $$, esc, setCurrency, setRegion, getTz, applyTheme, toast, fail, ok, openModal, initials, ago, money, fmtDate } from './ui.js';
-import { BIZ_LOGOS, DEFAULT_LOGO } from './config.js';
+import { $, $$, esc, setCurrency, setRegion, getTz, applyTheme, toast, fail, ok, openModal, initials, ago, money, fmtDate, bizLogo, hasCustomLogo } from './ui.js';
+import { DEFAULT_LOGO } from './config.js';
+import { init as i18nInit, t, loc, getLang, setResolved, resolve, LANGS } from './i18n.js';
+
+i18nInit(); // Swahili mode: translate the page and keep translating everything the app renders
 
 if (!session.token) location.replace('index.html');
 
@@ -56,6 +59,18 @@ export const ctx = {
   async refreshBadge() { if (!this.biz) return; try { if (this.can('orders.view')) { const r = await get('/b/orders', { status: 'new', limit: 1 }); this.badge = r.total; } if (this.biz.modules && this.biz.modules.alerts) { const a = await get('/b/notifications', { unread: 1, limit: 1 }); this.alerts = a.unread ?? a.unread_count ?? 0; } renderNav(); } catch { /* ignore */ } }
 };
 
+ctx.refreshBrand = function () {
+  if (!this.biz) return;
+  this.logo = bizLogo(this.biz);
+  const m = this.profile && this.profile.memberships.find(x => x.business.id === this.biz.id); if (m) m.business.theme = { ...(this.biz.theme || {}) };
+  applyBrand(); renderBrand(); renderBizSwitch();
+};
+/** Re-evaluates which language applies (personal choice → business default → platform default → English) and reloads once if it changed. */
+ctx.applyLanguage = function () {
+  const want = resolve({ personal: this.profile && this.profile.language, business: this.biz && this.biz.settings && this.biz.settings.language, platform: this.platformTheme && this.platformTheme.default_language });
+  if (setResolved(want)) location.reload();
+};
+
 const modOn = n => !n.mod || n.dev || !ctx.biz || (n.mod === '_group' ? !!ctx.biz.group_id : ctx.biz.modules ? ctx.biz.modules[n.mod] !== false : true);
 const allowed = n => n.group ? true : !modOn(n) ? false : n.dev ? ctx.isDev : n.superOnly ? ctx.isSuper : n.perm ? ctx.can(n.perm) : n.any ? ctx.canAny(n.any) : true;
 const needsBiz = id => !id.startsWith('dev-');
@@ -81,12 +96,11 @@ async function selectBusiness(id, first = false) {
     ctx.biz = await get('/b/business'); ctx.role = ctx.biz.role; ctx.perms = new Set(ctx.biz.permissions); ctx.isSuper = ctx.role === 'super_admin';
     setCurrency(ctx.biz.currency); setRegion({ timezone: ctx.biz.timezone || ctx.biz.settings.timezone, date_format: ctx.biz.settings.date_format }); ctx.tz = getTz(); ctx.fmtCfg = { tz: ctx.tz, date_format: ctx.biz.settings.date_format || 'DD/MM/YYYY' };
     { const t = document.getElementById('tzNote'); if (t) t.textContent = ctx.tz.replace(/_/g, ' '); }
-    ctx.logo = BIZ_LOGOS[ctx.biz.slug] || DEFAULT_LOGO;
-    ctx.fullLogo = ctx.biz.slug === 'zanlux' ? 'assets/zanlux-logo.png' : null;
+    ctx.logo = bizLogo(ctx.biz);
     applyBrand();
     openStream();
   } else { ctx.biz = null; ctx.role = 'developer'; ctx.isSuper = true; ctx.perms = new Set(); applyBrand(); closeStream(); }
-  renderBrand(); renderBizSwitch(); renderUser(); renderNav(); ctx.refreshBadge();
+  renderBrand(); renderBizSwitch(); renderUser(); renderLang(); renderNav(); ctx.refreshBadge(); ctx.applyLanguage();
   if (first) { window.addEventListener('hashchange', route); }
   if (!location.hash || (!ctx.biz && needsBiz(currentId())) || (ctx.biz && !allowed(NAV.find(n => n.id === currentId()) || {}))) location.hash = '#/' + (ctx.biz ? 'dashboard' : 'dev-overview');
   else route();
@@ -98,20 +112,23 @@ function applyBrand() {
   applyTheme({ primary: t.primary || '#d4af55', accent: t.accent || '#f1d98a', mode });
   $('#themeBtn i').className = 'bi ' + (mode === 'dark' ? 'bi-moon-stars' : 'bi-sun');
   document.title = (ctx.biz ? ctx.biz.short_name : 'FBBMS') + ' · FBBMS';
+  const fav = document.querySelector('link[rel="icon"]'); if (fav) { const href = ctx.biz && hasCustomLogo(ctx.biz) ? ctx.logo : 'assets/favicon.png'; if (fav.getAttribute('href') !== href) { fav.setAttribute('href', href); fav.removeAttribute('type'); } }
 }
 
+const FALLBACK = `onerror="this.onerror=null;this.src='${DEFAULT_LOGO}'"`;
 function renderBrand() {
   const b = ctx.biz;
-  const logoSrc = b ? ctx.logo : DEFAULT_LOGO;
-  const w = b && b.slug === 'zanlux' ? 120 : 84;
-  $('#brand').innerHTML = `<div class="logo-anim glow" style="width:${w}px;--logo-mask:url(${new URL(logoSrc, location.href).href})"><img src="${logoSrc}" alt="${esc(b ? b.short_name : 'FBBMS')}"></div>
+  const logoSrc = b ? ctx.logo : DEFAULT_LOGO; const custom = b && hasCustomLogo(b);
+  const w = custom ? '' : `width:${b && b.slug === 'zanlux' ? 120 : 84}px;`;
+  const imgStyle = custom ? ' style="width:auto;height:auto;max-width:150px;max-height:96px"' : '';
+  $('#brand').innerHTML = `<div class="logo-anim glow" style="${w}--logo-mask:url(${new URL(logoSrc, location.href).href})"><img src="${esc(logoSrc)}" alt="${esc(b ? b.short_name : 'FBBMS')}"${imgStyle} ${FALLBACK}></div>
     <div><div class="brand-name">${esc(b ? b.short_name : 'FBBMS')}</div><div class="brand-sub">${esc(b ? (b.tagline || 'Management') : 'Developer console')}</div></div>`;
 }
 
 function renderBizSwitch() {
   const ms = ctx.profile.memberships; const b = ctx.biz;
-  const cur = b ? `<img src="${ctx.logo}" alt=""><div><div class="nm">${esc(b.name)}</div><small>${b.role === 'sub_admin' ? 'Shopkeeper' : ctx.isDev ? 'Developer access' : 'Super Admin'}</small></div>` : `<img src="${DEFAULT_LOGO}" alt=""><div><div class="nm">Developer console</div><small>All businesses</small></div>`;
-  const items = ms.map(m => `<li><a class="dropdown-item d-flex align-items-center gap-2 ${b && m.business.id === b.id ? 'active' : ''}" href="#" data-biz="${m.business.id}"><img src="${BIZ_LOGOS[m.business.slug] || DEFAULT_LOGO}" width="22" height="22" style="object-fit:contain"> ${esc(m.business.name)}</a></li>`).join('');
+  const cur = b ? `<img src="${esc(ctx.logo)}" alt="" width="28" height="28" style="object-fit:contain" ${FALLBACK}><div><div class="nm">${esc(b.name)}</div><small>${b.role === 'sub_admin' ? 'Shopkeeper' : ctx.isDev ? 'Developer access' : 'Super Admin'}</small></div>` : `<img src="${DEFAULT_LOGO}" alt=""><div><div class="nm">Developer console</div><small>All businesses</small></div>`;
+  const items = ms.map(m => `<li><a class="dropdown-item d-flex align-items-center gap-2 ${b && m.business.id === b.id ? 'active' : ''}" href="#" data-biz="${m.business.id}"><img src="${esc(bizLogo(m.business))}" width="22" height="22" style="object-fit:contain" ${FALLBACK}> ${esc(m.business.name)}</a></li>`).join('');
   $('#bizWrap').innerHTML = `<button class="biz-switch" data-bs-toggle="dropdown">${cur}<i class="bi bi-chevron-expand muted ms-1"></i></button>
     <ul class="dropdown-menu">${items}${ctx.isDev ? `<li><hr class="dropdown-divider"></li><li><a class="dropdown-item" href="#" data-biz="0"><i class="bi bi-cpu me-2"></i>Developer console</a></li>` : ''}</ul>`;
   $$('[data-biz]', $('#bizWrap')).forEach(a => a.onclick = async e => { e.preventDefault(); const id = Number(a.dataset.biz) || null; if (id === session.biz) return; ctx.badge = 0; await selectBusiness(id); location.hash = '#/' + (id ? 'dashboard' : 'dev-overview'); });
@@ -125,6 +142,25 @@ function renderUser() {
     <li><a class="dropdown-item" href="#" id="miOut"><i class="bi bi-box-arrow-right me-2"></i>Sign out</a></li></ul>`;
   $('#miProfile').onclick = e => { e.preventDefault(); profileModal(); };
   $('#miOut').onclick = e => { e.preventDefault(); session.clear(); location.href = 'index.html'; };
+}
+
+/* ---------------- language switcher ---------------- */
+function renderLang() {
+  const cur = LANGS.find(l => l.code === getLang()) || LANGS[0]; const p = ctx.profile && ctx.profile.language;
+  const biz = ctx.biz && ctx.biz.settings && ctx.biz.settings.language; const plat = ctx.platformTheme && ctx.platformTheme.default_language;
+  const dflt = LANGS.find(l => l.code === resolve({ business: biz, platform: plat })) || LANGS[0];
+  $('#langWrap').innerHTML = `<button class="icon-btn lang-btn" data-bs-toggle="dropdown" aria-label="Language" title="Language"><i class="bi bi-translate"></i><span class="lang-code" data-no-i18n>${cur.short}</span></button>
+    <ul class="dropdown-menu dropdown-menu-end" style="min-width:210px"><li class="dropdown-header">Language</li>
+    ${LANGS.map(l => `<li><a class="dropdown-item d-flex align-items-center gap-2 ${l.code === getLang() ? 'active' : ''}" href="#" data-lang="${l.code}"><span data-no-i18n>${l.native}</span>${l.code === p ? '<i class="bi bi-check2 ms-auto"></i>' : ''}</a></li>`).join('')}
+    ${p ? `<li><hr class="dropdown-divider"></li><li><a class="dropdown-item small" href="#" data-lang=""><i class="bi bi-arrow-counterclockwise me-1"></i>Use the default (<span data-no-i18n>${dflt.native}</span>)</a></li>` : ''}</ul>`;
+  $$('[data-lang]', $('#langWrap')).forEach(a => a.onclick = async e => { e.preventDefault(); await chooseLanguage(a.dataset.lang || null); });
+}
+async function chooseLanguage(code) {
+  try {
+    await put('/auth/language', { language: code }); ctx.profile.language = code;
+    const next = resolve({ personal: code, business: ctx.biz && ctx.biz.settings && ctx.biz.settings.language, platform: ctx.platformTheme && ctx.platformTheme.default_language });
+    if (setResolved(next)) location.reload(); else renderLang();
+  } catch (e) { fail(e); }
 }
 
 function renderNav() {
@@ -186,7 +222,7 @@ function onLive(ev, d) {
   else if (ev === 'stock.low' && ctx.can('products.view')) { toast('warn', 'Low stock', `${d.name}: ${d.stock_qty} left`); notify('bi-exclamation-triangle', 'Low stock', `${d.name}: ${d.stock_qty} left`, 'warn'); }
   else if (ev === 'notification') { const k = d.severity === 'critical' ? 'error' : d.severity === 'warn' ? 'warn' : 'info'; if (d.severity !== 'info') toast(k, d.title, d.body || '', 8000); notify('bi-bell', d.title, d.body || '', d.severity === 'info' ? 'info' : 'warn'); ctx.alerts++; renderNav(); }
   else if (ev === 'order.updated') ctx.refreshBadge();
-  else if (ev === 'settings.changed') get('/b/business').then(b => { ctx.biz = b; applyBrand(); });
+  else if (ev === 'settings.changed') get('/b/business').then(b => { ctx.biz = b; ctx.refreshBrand(); ctx.applyLanguage(); });
   ctx.emit(ev, d);
 }
 function renderBell() {
@@ -201,8 +237,8 @@ renderBell();
 /* ---------------- clock, theme, menu ---------------- */
 function tick() {
   const n = new Date();
-  $('#clockT').textContent = new Intl.DateTimeFormat('en-GB', { timeZone: getTz(), hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).format(n);
-  $('#clockD').textContent = new Intl.DateTimeFormat('en-GB', { timeZone: getTz(), weekday: 'long', day: 'numeric', month: 'long' }).format(n);
+  $('#clockT').textContent = new Intl.DateTimeFormat(loc('en-GB'), { timeZone: getTz(), hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).format(n);
+  $('#clockD').textContent = new Intl.DateTimeFormat(loc('en-GB'), { timeZone: getTz(), weekday: 'long', day: 'numeric', month: 'long' }).format(n);
 }
 tick(); setInterval(tick, 1000);
 $('#themeBtn').onclick = () => { const m = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; localStorage.setItem('fbbms_mode', m); applyBrand(); ctx.emit('theme'); };

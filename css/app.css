@@ -204,3 +204,21 @@ button[aria-busy=true] .spinner-border{vertical-align:-.12em}
 .skeleton:after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--text) 6%,transparent),transparent);animation:skeletonSweep 1.4s infinite}
 @keyframes skeletonSweep{to{transform:translateX(100%)}}
 @media(prefers-reduced-motion:reduce){.boot-spinner,.skeleton:after{animation:none}}
+
+/* ---- business logo manager ---- */
+.logo-mgr{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
+.logo-drop{position:relative;width:132px;height:132px;flex:0 0 132px;border-radius:18px;border:1.5px dashed var(--border2);display:grid;place-items:center;cursor:pointer;overflow:hidden;
+  background-color:var(--surface2,var(--surface));background-image:linear-gradient(45deg,rgba(128,128,128,.14) 25%,transparent 25%,transparent 75%,rgba(128,128,128,.14) 75%),linear-gradient(45deg,rgba(128,128,128,.14) 25%,transparent 25%,transparent 75%,rgba(128,128,128,.14) 75%);background-size:16px 16px;background-position:0 0,8px 8px;transition:border-color .2s,box-shadow .2s,transform .2s}
+.logo-drop:hover,.logo-drop:focus-visible,.logo-drop.is-over{border-color:var(--primary);box-shadow:0 0 0 4px color-mix(in srgb,var(--primary) 18%,transparent);outline:none}
+.logo-drop.is-over{transform:scale(1.03)}
+.logo-drop img{max-width:86%;max-height:86%;object-fit:contain;position:relative;z-index:1}
+.logo-hint{position:absolute;inset:auto 0 0 0;z-index:2;display:flex;flex-direction:column;align-items:center;gap:2px;padding:18px 6px 7px;font-size:.66rem;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.72));opacity:0;transition:opacity .2s}
+.logo-hint i{font-size:1rem}
+.logo-drop:hover .logo-hint,.logo-drop:focus-visible .logo-hint,.logo-drop.is-over .logo-hint{opacity:1}
+.logo-busy{position:absolute;inset:0;z-index:3;display:grid;place-items:center;background:rgba(0,0,0,.45)}
+.logo-info{flex:1 1 220px;min-width:0}
+.logo-preview-row{display:flex;gap:10px;margin-top:10px}
+.logo-preview-row .lp{width:84px;height:62px;border-radius:12px;display:grid;place-items:center;border:1px solid var(--border)}
+.logo-preview-row .lp.dark{background:#0c0c0f}.logo-preview-row .lp.light{background:#fff}
+.logo-preview-row .lp img{max-width:80%;max-height:80%;object-fit:contain}
+@media(prefers-reduced-motion:reduce){.logo-drop{transition:none}}

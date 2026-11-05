@@ -1,3 +1,4 @@
+import { t } from '../i18n.js';
 import { get, post } from '../api.js';
 import { esc, money, fmtDateTime, fmtDate, openModal, fail, ok, empty, skeleton, pill, todayEAT } from '../ui.js';
 
@@ -54,6 +55,6 @@ export async function closingReport(ctx, date) {
       ${(r.low_stock || []).length ? `<h6 class="mt-3">Low stock</h6><div class="small">${r.low_stock.map(p => `${esc(p.name)} (${p.stock_qty})`).join(', ')}</div>` : ''}</div>`;
     } catch (e) { m.el.querySelector('#rp').innerHTML = `<div class="text-danger">${esc(e.message)}</div>`; }
   };
-  m.el.querySelector('#rd').onchange = draw; m.el.querySelector('#pr').onclick = () => { const w = window.open('', '_blank'); w.document.write(`<html><head><title>Closing report</title><style>body{font-family:system-ui,sans-serif;max-width:720px;margin:20px auto;color:#111}.total-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dotted #bbb}.kpi{border:1px solid #ccc;padding:6px;border-radius:6px}.lbl{font-size:.75em;color:#666}.row{display:flex;flex-wrap:wrap;gap:8px}.col-6,.col-md-3{flex:1 1 22%}.pill{font-weight:700}.muted{color:#666}h6{margin:14px 0 4px}</style></head><body>${m.el.querySelector('#zrep').innerHTML}</body></html>`); w.document.close(); w.print(); };
+  m.el.querySelector('#rd').onchange = draw; m.el.querySelector('#pr').onclick = () => { const w = window.open('', '_blank'); w.document.write(`<html><head><title>${t('Closing report')}</title><style>body{font-family:system-ui,sans-serif;max-width:720px;margin:20px auto;color:#111}.total-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dotted #bbb}.kpi{border:1px solid #ccc;padding:6px;border-radius:6px}.lbl{font-size:.75em;color:#666}.row{display:flex;flex-wrap:wrap;gap:8px}.col-6,.col-md-3{flex:1 1 22%}.pill{font-weight:700}.muted{color:#666}h6{margin:14px 0 4px}</style></head><body>${m.el.querySelector('#zrep').innerHTML}</body></html>`); w.document.close(); w.print(); };
   await draw();
 }
