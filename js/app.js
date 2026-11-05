@@ -1,4 +1,6 @@
 import { api, get, post, put, session, streamUrl } from './api.js';
+import { initBilling, refreshBilling, setBillingFromBusiness, renderBar, payModal } from './billing.js';
+import { setBilling } from './billing-state.js';
 import { $, $$, esc, setCurrency, setRegion, getTz, applyTheme, toast, fail, ok, openModal, initials, ago, money, fmtDate, bizLogo, hasCustomLogo } from './ui.js';
 import { DEFAULT_LOGO } from './config.js';
 import { init as i18nInit, t, loc, getLang, setResolved, resolve, LANGS } from './i18n.js';
@@ -35,9 +37,11 @@ const NAV = [
   { id: 'integrations', label: 'API & webhooks', icon: 'bi-plug-fill', mod: 'public_api', superOnly: true },
   { id: 'branches', label: 'Branches', icon: 'bi-diagram-3-fill', mod: '_group', superOnly: true },
   { id: 'settings', label: 'Shop & website', icon: 'bi-sliders', superOnly: true },
+  { id: 'billing', label: 'Billing & plan', icon: 'bi-credit-card-2-front-fill', superOnly: true },
   { group: 'Platform', dev: true },
   { id: 'dev-overview', label: 'Developer console', icon: 'bi-cpu-fill', dev: true },
   { id: 'dev-businesses', label: 'Businesses', icon: 'bi-shop-window', dev: true },
+  { id: 'dev-billing', label: 'Billing & revenue', icon: 'bi-cash-coin', dev: true },
   { id: 'dev-users', label: 'All users', icon: 'bi-person-lines-fill', dev: true },
   { id: 'dev-ai', label: 'AI settings', icon: 'bi-robot', dev: true },
   { id: 'dev-modules', label: 'Feature modules', icon: 'bi-toggles', dev: true },
@@ -97,9 +101,10 @@ async function selectBusiness(id, first = false) {
     setCurrency(ctx.biz.currency); setRegion({ timezone: ctx.biz.timezone || ctx.biz.settings.timezone, date_format: ctx.biz.settings.date_format }); ctx.tz = getTz(); ctx.fmtCfg = { tz: ctx.tz, date_format: ctx.biz.settings.date_format || 'DD/MM/YYYY' };
     { const t = document.getElementById('tzNote'); if (t) t.textContent = ctx.tz.replace(/_/g, ' '); }
     ctx.logo = bizLogo(ctx.biz);
+    initBilling(ctx); setBillingFromBusiness(ctx, ctx.biz.billing);
     applyBrand();
     openStream();
-  } else { ctx.biz = null; ctx.role = 'developer'; ctx.isSuper = true; ctx.perms = new Set(); applyBrand(); closeStream(); }
+  } else { setBilling(null); renderBar(); ctx.biz = null; ctx.role = 'developer'; ctx.isSuper = true; ctx.perms = new Set(); applyBrand(); closeStream(); }
   renderBrand(); renderBizSwitch(); renderUser(); renderLang(); renderNav(); ctx.refreshBadge(); ctx.applyLanguage();
   if (first) { window.addEventListener('hashchange', route); }
   if (!location.hash || (!ctx.biz && needsBiz(currentId())) || (ctx.biz && !allowed(NAV.find(n => n.id === currentId()) || {}))) location.hash = '#/' + (ctx.biz ? 'dashboard' : 'dev-overview');
@@ -209,7 +214,7 @@ function openStream() {
   es = new EventSource(streamUrl());
   es.addEventListener('hello', () => setLive(true));
   es.onerror = () => setLive(false);
-  const evs = ['notification', 'sale.new', 'sale.voided', 'order.new', 'order.updated', 'product.changed', 'stock.low', 'expense.new', 'settings.changed'];
+  const evs = ['notification', 'sale.new', 'sale.voided', 'order.new', 'order.updated', 'product.changed', 'stock.low', 'expense.new', 'settings.changed', 'billing.changed', 'billing.prompt'];
   evs.forEach(ev => es.addEventListener(ev, m => { let d = {}; try { d = JSON.parse(m.data); } catch (_) {} onLive(ev, d); }));
 }
 function beep() { try { const a = new (window.AudioContext || window.webkitAudioContext)(); const o = a.createOscillator(), g = a.createGain(); o.connect(g); g.connect(a.destination); o.type = 'sine'; o.frequency.value = 880; g.gain.setValueAtTime(.001, a.currentTime); g.gain.exponentialRampToValueAtTime(.2, a.currentTime + .02); g.gain.exponentialRampToValueAtTime(.001, a.currentTime + .5); o.start(); o.stop(a.currentTime + .5); } catch (_) {} }
@@ -222,7 +227,9 @@ function onLive(ev, d) {
   else if (ev === 'stock.low' && ctx.can('products.view')) { toast('warn', 'Low stock', `${d.name}: ${d.stock_qty} left`); notify('bi-exclamation-triangle', 'Low stock', `${d.name}: ${d.stock_qty} left`, 'warn'); }
   else if (ev === 'notification') { const k = d.severity === 'critical' ? 'error' : d.severity === 'warn' ? 'warn' : 'info'; if (d.severity !== 'info') toast(k, d.title, d.body || '', 8000); notify('bi-bell', d.title, d.body || '', d.severity === 'info' ? 'info' : 'warn'); ctx.alerts++; renderNav(); }
   else if (ev === 'order.updated') ctx.refreshBadge();
-  else if (ev === 'settings.changed') get('/b/business').then(b => { ctx.biz = b; ctx.refreshBrand(); ctx.applyLanguage(); });
+  else if (ev === 'settings.changed') get('/b/business').then(b => { ctx.biz = b; setBillingFromBusiness(ctx, b.billing); ctx.refreshBrand(); ctx.applyLanguage(); });
+  else if (ev === 'billing.changed') { refreshBilling().then(b => { if (!b) return; if (d.status === 'completed' && !mine) toast('success', 'Subscription renewed', 'Your shop is fully unlocked.'); else if (d.status === 'locked') toast('error', 'Read-only mode', 'Your subscription has ended. Renew to continue.', 9000); }); }
+  else if (ev === 'billing.prompt' && ctx.isSuper && !ctx.isDev) { toast('warn', 'Approve your renewal', 'A payment request was sent to your phone. Enter your PIN to confirm.', 12000); beep(); if (d.payment_id) payModal({ plan: { key: 'monthly', price: 0, days: 30 }, follow: d.payment_id }); }
   ctx.emit(ev, d);
 }
 function renderBell() {

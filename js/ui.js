@@ -1,5 +1,6 @@
 import { TZ as DEFAULT_TZ, BIZ_LOGOS, DEFAULT_LOGO } from './config.js';
 import { loc, t } from './i18n.js';
+import { blocked } from './billing-state.js';
 
 /* Regional settings come from the business (timezone, date format). Set once after the business loads. */
 let TZ = DEFAULT_TZ, DFMT = 'DD/MM/YYYY';
@@ -56,7 +57,7 @@ export function toast(type, title, msg = '', ms = 4500) {
   toastWrap.appendChild(el); setTimeout(() => { el.style.opacity = 0; el.style.transition = '.3s'; setTimeout(() => el.remove(), 300); }, ms);
 }
 export const ok = (t, m) => toast('success', t, m);
-export const fail = e => toast('error', 'Something went wrong', e && e.message ? e.message : String(e));
+export const fail = e => (e && e.silent) ? undefined : toast('error', 'Something went wrong', e && e.message ? e.message : String(e));
 
 /* ---------- modal ---------- */
 export function openModal({ title, body, footer = '', size = '', onShown }) {
@@ -103,6 +104,7 @@ export function pager(el, { total, page, limit }, go) {
 }
 
 export function downloadCSV(filename, rows) {
+  if (blocked('export')) return;
   const csv = rows.map(r => r.map(c => { const s = String(c ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }).join(',')).join('\r\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })); a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }

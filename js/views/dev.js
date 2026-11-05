@@ -5,6 +5,7 @@ import { API_BASE } from '../config.js';
 import { mountLogoManager } from '../logo-manager.js';
 import { prepareLogo } from '../ui.js';
 import { detailText } from './audit.js';
+import { billChip, billingModal, devBilling } from './dev-billing.js';
 
 const showPw = (name, email, pw) => openModal({ title: '🔑 Temporary password', size: 'modal-sm', body: `<p>For <b>${esc(name)}</b> (${esc(email)}). Shown <b>only once</b>; they must change it at first sign-in.</p><div class="pw-box">${esc(pw)}</div><button class="btn btn-soft w-100 mt-3" onclick="navigator.clipboard.writeText('${esc(pw)}');this.textContent='Copied ✓'">Copy</button>` });
 const openBiz = id => { session.biz = id; location.hash = '#/dashboard'; location.reload(); };
@@ -34,8 +35,9 @@ export const views = {
     const draw = () => {
       el.querySelector('#l').innerHTML = list.map(b => `<div class="col-md-6 col-xl-4"><div class="fb-card h-100 ${b.status === 'suspended' ? 'opacity-75' : ''}"><div class="d-flex gap-3 align-items-center mb-3"><img src="${esc(bizLogo(b))}" width="54" height="54" style="object-fit:contain"><div class="flex-grow-1"><div class="fw-bold fs-6">${esc(b.name)}</div><div class="small muted">${esc(b.tagline || '')}</div></div>${b.status === 'active' ? pill('Active', 'success') : pill('Suspended', 'danger')}</div>
         <div class="row text-center g-2 mb-3"><div class="col-4"><div class="fw-bold">${b.super_admins}</div><div class="small muted">Super admins</div></div><div class="col-4"><div class="fw-bold">${b.sub_admins}</div><div class="small muted">Shopkeepers</div></div><div class="col-4"><div class="fw-bold">${b.products}</div><div class="small muted">Products</div></div></div>
-        <div class="small muted mb-3">${pill(b.template, 'gold')} code <b>${esc(b.code)}</b> · ${esc(b.settings.website || 'no website')} · ${num(b.sales_count)} sales</div><div class="d-flex flex-wrap gap-2"><button class="btn btn-sm btn-fb" data-o="${b.id}">Open</button><button class="btn btn-sm btn-soft" data-a="${b.id}"><i class="bi bi-person-gear me-1"></i>Admins</button><button class="btn btn-sm btn-soft" data-e="${b.id}"><i class="bi bi-pencil me-1"></i>Edit</button></div></div></div>`).join('') || empty('bi-shop', 'No businesses yet');
+        <div class="small muted mb-3">${pill(b.template, 'gold')} ${billChip(b.billing)} code <b>${esc(b.code)}</b> · ${esc(b.settings.website || 'no website')} · ${num(b.sales_count)} sales</div><div class="d-flex flex-wrap gap-2"><button class="btn btn-sm btn-fb" data-o="${b.id}">Open</button><button class="btn btn-sm btn-soft" data-bl="${b.id}"><i class="bi bi-cash-coin me-1"></i>Billing</button><button class="btn btn-sm btn-soft" data-a="${b.id}"><i class="bi bi-person-gear me-1"></i>Admins</button><button class="btn btn-sm btn-soft" data-e="${b.id}"><i class="bi bi-pencil me-1"></i>Edit</button></div></div></div>`).join('') || empty('bi-shop', 'No businesses yet');
       el.querySelectorAll('[data-o]').forEach(b => b.onclick = () => openBiz(Number(b.dataset.o)));
+      el.querySelectorAll('[data-bl]').forEach(b => b.onclick = () => billingModal(list.find(x => x.id == b.dataset.bl), load));
       el.querySelectorAll('[data-e]').forEach(b => b.onclick = () => edit(list.find(x => x.id == b.dataset.e)));
       el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => admins(list.find(x => x.id == b.dataset.a)));
     };
@@ -259,3 +261,5 @@ views.overview = async function (el, ctx) {
     btn.insertAdjacentElement('afterend', b);
   });
 };
+
+views.billing = devBilling;

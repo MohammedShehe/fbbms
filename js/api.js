@@ -1,4 +1,5 @@
 import { API_BASE } from './config.js';
+import { blocked, setBilling, getBilling } from './billing-state.js';
 
 export const session = {
   get token() { return localStorage.getItem('fbbms_token'); },
@@ -8,11 +9,13 @@ export const session = {
   clear() { localStorage.removeItem('fbbms_token'); localStorage.removeItem('fbbms_biz'); }
 };
 
-export class ApiError extends Error { constructor(msg, status, detail) { super(msg); this.status = status; this.detail = detail; } }
+export class ApiError extends Error { constructor(msg, status, detail, silent = false) { super(msg); this.status = status; this.detail = detail; this.silent = silent; } }
 
 const qs = p => { const u = new URLSearchParams(); Object.entries(p || {}).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') u.append(k, v); }); const s = u.toString(); return s ? '?' + s : ''; };
 
 export async function api(path, { method = 'GET', body, params, auth = true } = {}) {
+  // Unpaid business = read-only. Stop writes here (the server enforces it too) and show the renew popup instead of an error.
+  if (method !== 'GET' && path.startsWith('/b/') && !path.startsWith('/b/billing') && path !== '/b/notifications/read' && blocked('write')) throw new ApiError('Subscription required', 402, null, true);
   const headers = { 'Content-Type': 'application/json' };
   if (auth && session.token) headers.Authorization = 'Bearer ' + session.token;
   if (path.startsWith('/b/') && session.biz) headers['X-Business-Id'] = String(session.biz);
@@ -20,6 +23,11 @@ export async function api(path, { method = 'GET', body, params, auth = true } = 
   try { res = await fetch(API_BASE + path + qs(params), { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined }); }
   catch { throw new ApiError('Cannot reach the server. Check your internet connection.', 0); }
   let data = null; try { data = await res.json(); } catch { /* empty */ }
+  if (res.status === 402 && data && data.code === 'SUBSCRIPTION_REQUIRED') {
+    const cur = getBilling() || {}; setBilling({ ...cur, locked: true, state: 'expired' }); blocked('write');
+    document.dispatchEvent(new CustomEvent('billing:refresh'));
+    throw new ApiError(data.message, 402, null, true);
+  }
   if (!res.ok) {
     if (res.status === 401 && auth && session.token) { session.clear(); location.href = 'index.html?expired=1'; }
     throw new ApiError((data && data.message) || 'Request failed', res.status, data && data.detail);
