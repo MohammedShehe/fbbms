@@ -9,6 +9,7 @@ export async function render(el, ctx) {
   let products = prod.rows; let cart = []; let cat = ''; let search = '';
   const S = ctx.biz.settings || {}; const mods = ctx.biz.modules || {};
   const canDisc = ctx.can('sales.discount'); const canPrice = ctx.can('sales.price_override'); const maxPct = ctx.isSuper ? 100 : (S.max_discount_pct ?? 15);
+  const canBackdate = ctx.isSuper || ctx.can('sales.backdate');
   const useCust = !!mods.customers; const canCredit = (ctx.isSuper || ctx.can('sales.credit')) && S.allow_credit !== false && useCust;
   const loyaltyOn = useCust && !!S.loyalty_enabled; const ptValue = Number(S.loyalty_point_value) || 0;
   const taxRate = Math.max(0, Number(S.tax_rate_pct) || 0); const taxIncl = S.tax_inclusive !== false; const taxName = S.tax_name || 'Tax';
@@ -16,8 +17,10 @@ export async function render(el, ctx) {
   const holdKey = `fbbms_hold_${ctx.biz.id}`;
   const holds = () => { try { return JSON.parse(localStorage.getItem(holdKey) || '[]'); } catch { return []; } };
   const saveHolds = h => { try { localStorage.setItem(holdKey, JSON.stringify(h.slice(0, 20))); } catch { /* storage unavailable */ } };
+  const todayStr = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const minPastStr = () => { const d = new Date(); d.setDate(d.getDate() - 730); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 
-  el.innerHTML = `<div class="page-head"><div><h1>New sale</h1><p>Tap products or scan a barcode. Stock is checked and deducted automatically.</p></div>
+  el.innerHTML = `<div class="page-head"><div><h1>New sale</h1><p>Tap products or scan a barcode. Stock is checked and deducted automatically.${canBackdate ? ' You can also record past sales by changing the sale date.' : ''}</p></div>
     <div class="d-flex gap-2"><button class="btn btn-soft" id="holdBtn"><i class="bi bi-pause-circle me-1"></i>Hold</button><button class="btn btn-soft" id="resumeBtn"><i class="bi bi-play-circle me-1"></i>Held <span class="pill" id="holdN">0</span></button></div></div>
   <div class="pos"><div><div class="filters"><div class="search"><i class="bi bi-search"></i><input id="q" class="form-control" placeholder="Search name, brand, SKU or barcode…" autofocus></div>${'BarcodeDetector' in window ? '<button class="btn btn-soft" id="cam" title="Scan with camera"><i class="bi bi-camera"></i></button>' : ''}</div>
     <div class="chips" id="chips"></div><div class="pgrid" id="grid"></div></div>
@@ -27,10 +30,17 @@ export async function render(el, ctx) {
     <div class="row g-2 mt-1">${useCust ? '' : '<div class="col-6"><label class="form-label">Customer (optional)</label><input id="cName" class="form-control" placeholder="Name"></div><div class="col-6"><label class="form-label">Phone (optional)</label><input id="cPhone" class="form-control" placeholder="07…" inputmode="tel"></div>'}
       ${canDisc ? `<div class="col-6"><label class="form-label">Discount (${esc(ctx.biz.currency)})${ctx.isSuper ? '' : ` · max ${maxPct}%`}</label><input id="disc" type="number" min="0" class="form-control" placeholder="0"></div>` : ''}
       <div class="col-${canDisc ? 6 : 12}" id="redeemBox"></div>
+      ${canBackdate ? `<div class="col-6"><label class="form-label">Sale date <span class="muted small">(past allowed)</span></label><input id="saleDate" type="date" class="form-control" value="${todayStr()}" max="${todayStr()}" min="${minPastStr()}"></div><div class="col-6" id="backdateHint" style="display:none"><label class="form-label">&nbsp;</label><div class="form-control-plaintext small text-warning"><i class="bi bi-clock-history me-1"></i>Backdated — stock deducted from current levels</div></div>` : ''}
       <div class="col-12"><input id="notes" class="form-control" placeholder="Note (optional)" maxlength="200"></div></div>
     <div class="mt-3" id="paySec"></div>
     <button class="btn btn-fb btn-lg w-100 mt-3" id="pay-btn" disabled><i class="bi bi-check2-circle me-1"></i>Complete sale</button></div></div></div>`;
   const $ = s => el.querySelector(s);
+  if (canBackdate && $('#saleDate')) {
+    $('#saleDate').onchange = () => {
+      const hint = $('#backdateHint');
+      if (hint) hint.style.display = ($('#saleDate').value && $('#saleDate').value < todayStr()) ? '' : 'none';
+    };
+  }
 
   /* ---------- catalogue ---------- */
   const chips = () => { $('#chips').innerHTML = `<span class="chip ${cat === '' ? 'active' : ''}" data-c="">All</span>` + cats.filter(c => c.product_count).map(c => `<span class="chip ${cat == c.id ? 'active' : ''}" data-c="${c.id}">${esc(c.name)} <small>${c.product_count}</small></span>`).join(''); $('#chips').querySelectorAll('.chip').forEach(c => c.onclick = () => { cat = c.dataset.c; chips(); grid(); }); };
@@ -128,7 +138,7 @@ export async function render(el, ctx) {
     });
     m.el.querySelectorAll('[data-d]').forEach(b => b.onclick = () => { h.splice(+b.dataset.d, 1); saveHolds(h); m.close(); holdUi(); });
   };
-  const reset = () => { cart = []; customer = null; redeem = 0; pays = [{ method: 'cash', amount: '' }]; ['#cName', '#cPhone', '#notes', '#disc'].forEach(s => { if ($(s)) $(s).value = ''; }); draw(); };
+  const reset = () => { cart = []; customer = null; redeem = 0; pays = [{ method: 'cash', amount: '' }]; ['#cName', '#cPhone', '#notes', '#disc'].forEach(s => { if ($(s)) $(s).value = ''; }); if ($('#saleDate')) { $('#saleDate').value = todayStr(); if ($('#backdateHint')) $('#backdateHint').style.display = 'none'; } draw(); };
 
   /* ---------- barcode scanning ---------- */
   const scanCode = async code => {
@@ -168,6 +178,7 @@ export async function render(el, ctx) {
     if (customer) body.customer_id = customer.id; else if (!useCust) { body.customer_name = $('#cName').value; body.customer_phone = $('#cPhone').value; }
     if (t.r > 0) body.redeem_points = t.r;
     if (pays.length === 1 && pays[0].amount === '') body.payment_method = pays[0].method; else body.payments = pays.filter(p => Number(p.amount) > 0).map(p => ({ method: p.method, amount: Number(p.amount) }));
+    if (canBackdate && $('#saleDate') && $('#saleDate').value) body.sale_date = $('#saleDate').value;
     try {
       const r = await post('/b/sales', body);
       ok('Sale complete 🎉', `${r.receipt_no} · ${money(r.total)}${r.balance_due > 0 ? ' · owed ' + money(r.balance_due) : ''}`);
