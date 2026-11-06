@@ -9,7 +9,7 @@ import { billChip, billingModal, devBilling } from './dev-billing.js';
 
 const showPw = (name, email, pw) => openModal({ title: '🔑 Temporary password', size: 'modal-sm', body: `<p>For <b>${esc(name)}</b> (${esc(email)}). Shown <b>only once</b>; they must change it at first sign-in.</p><div class="pw-box">${esc(pw)}</div><button class="btn btn-soft w-100 mt-3" onclick="navigator.clipboard.writeText('${esc(pw)}');this.textContent='Copied ✓'">Copy</button>` });
 const openBiz = id => { session.biz = id; location.hash = '#/dashboard'; location.reload(); };
-let chart;
+let charts = [];
 
 export const views = {
   async overview(el, ctx) {
@@ -17,15 +17,27 @@ export const views = {
     el.innerHTML = `<div class="hero"><h1>${esc(g.title)}</h1><p>Developer console — every business on FBBMS at a glance.</p></div><div id="o">${skeleton(5, 70)}</div>`;
     const load = async () => {
       const d = await get('/developer/overview'); const T = d.totals;
-      el.querySelector('#o').innerHTML = `<div class="row g-3 mb-3">${[['Businesses', `${T.active_businesses}/${T.businesses}`, 'bi-shop-window', 'var(--primary)', 'active / total'], ['Revenue today', money(T.revenue_today), 'bi-cash-stack', 'var(--success)', 'all businesses'], ['Revenue this month', money(T.revenue_month), 'bi-calendar3', 'var(--info)', 'all businesses'], ['People', num(T.super_admins + T.sub_admins), 'bi-people', '#b07cff', `${T.super_admins} super admins · ${T.sub_admins} shopkeepers`]].map(([l, v, i, c, s]) => `<div class="col-6 col-xl-3"><div class="kpi" style="--c:${c}"><div class="ico"><i class="bi ${i}"></i></div><div class="lbl">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div></div>`).join('')}</div>
-      <div class="row g-3 mb-3"><div class="col-lg-8"><div class="fb-card"><h3>Revenue by business</h3><div class="card-sub">Last 14 days</div><div class="chart-box"><canvas id="cv"></canvas></div></div></div>
-      <div class="col-lg-4"><div class="fb-card h-100"><h3>Businesses</h3><div class="card-sub">Today & this month</div>${d.per_business.map(b => `<div class="feed-item"><img src="${esc(bizLogo({ slug: b.slug, theme: { logo_url: b.logo_url } }))}" width="36" height="36" style="object-fit:contain"><div class="flex-grow-1"><div class="fw-semibold">${esc(b.name)} ${b.status === 'suspended' ? pill('Suspended', 'danger') : ''}</div><div class="small muted">Today ${money(b.revenue_today)} · Month ${money(b.revenue_month)}</div></div><button class="btn btn-sm btn-soft" data-open="${b.id}">Open</button></div>`).join('')}</div></div></div>
+      const currencyRows = d.revenue_by_currency || [];
+      const fmtCurrency = (value, currency) => `${esc(currency || '—')} ${num(value)}`;
+      const revenueCards = currencyRows.length ? currencyRows.map(r => `<div class="col-6 col-xl-3"><div class="kpi" style="--c:var(--success)"><div class="ico"><i class="bi bi-cash-stack"></i></div><div class="lbl">Revenue today · ${esc(r.currency)}</div><div class="val">${fmtCurrency(r.revenue_today, r.currency)}</div><div class="sub">Month: ${fmtCurrency(r.revenue_month, r.currency)}</div></div></div>`).join('') : `<div class="col-12"><div class="fb-card muted">No revenue data yet.</div></div>`;
+      const businessRows = d.per_business.map(b => `<div class="feed-item"><img src="${esc(bizLogo({ slug: b.slug, theme: { logo_url: b.logo_url } }))}" width="36" height="36" style="object-fit:contain"><div class="flex-grow-1"><div class="fw-semibold">${esc(b.name)} ${b.status === 'suspended' ? pill('Suspended', 'danger') : ''}</div><div class="small muted">Today ${fmtCurrency(b.revenue_today, b.currency)} · Month ${fmtCurrency(b.revenue_month, b.currency)}</div></div><button class="btn btn-sm btn-soft" data-open="${b.id}">Open</button></div>`).join('');
+      const currencyGroups = [...new Set((d.series || []).map(s => s.currency || '—'))];
+      const chartPanels = currencyGroups.length ? currencyGroups.map((currency, i) => `<div class="fb-card mb-3"><h3>Revenue trend · ${esc(currency)}</h3><div class="card-sub">Last 14 days · values are only compared within this currency</div><div class="chart-box"><canvas id="revenue-currency-${i}"></canvas></div></div>`).join('') : `<div class="fb-card muted">No completed sales in the last 14 days.</div>`;
+      el.querySelector('#o').innerHTML = `<div class="row g-3 mb-3"><div class="col-6 col-xl-3"><div class="kpi" style="--c:var(--primary)"><div class="ico"><i class="bi bi-shop-window"></i></div><div class="lbl">Businesses</div><div class="val">${num(T.active_businesses)}/${num(T.businesses)}</div><div class="sub">active / total</div></div></div>${revenueCards}<div class="col-6 col-xl-3"><div class="kpi" style="--c:#b07cff"><div class="ico"><i class="bi bi-people"></i></div><div class="lbl">People</div><div class="val">${num(T.super_admins + T.sub_admins)}</div><div class="sub">${num(T.super_admins)} super admins · ${num(T.sub_admins)} shopkeepers</div></div></div></div>
+      <div class="row g-3 mb-3"><div class="col-lg-8"><h3 class="mb-2">Revenue by currency</h3>${chartPanels}</div>
+      <div class="col-lg-4"><div class="fb-card h-100"><h3>Businesses</h3><div class="card-sub">Today & this month · each business currency</div>${businessRows || empty('bi-shop', 'No businesses yet')}</div></div></div>
       <div class="fb-card"><h3>Recent platform activity</h3><div class="card-sub">Latest actions across all businesses</div>${d.recent.map(a => `<div class="feed-item"><div class="avatar"><i class="bi bi-activity"></i></div><div class="flex-grow-1"><div class="fw-semibold small">${esc(a.action)} <span class="muted">· ${esc(a.business || 'platform')}</span></div><div class="small muted text-truncate" style="max-width:600px">${esc(a.user_name || 'system')} · ${esc(detailText(a.details))}</div></div><div class="small muted">${ago(a.created_at)}</div></div>`).join('')}</div>`;
       el.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openBiz(Number(b.dataset.open)));
-      const t = chartTheme(); Chart.defaults.color = t.text; const names = [...new Set(d.series.map(s => s.name))]; if (chart) chart.destroy();
-      chart = new Chart(el.querySelector('#cv'), { type: 'line', data: { labels: d.days.map(shortDay), datasets: (names.length ? names : ['No sales']).map((n, i) => ({ label: n, data: d.days.map(day => { const r = d.series.find(s => s.d === day && s.name === n); return r ? Number(r.revenue) : 0; }), borderColor: PALETTE[i], backgroundColor: PALETTE[i] + '22', fill: true, tension: .38, pointRadius: 0, borderWidth: 2.5 })) }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { usePointStyle: true } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${money(c.raw)}` } } }, scales: { x: { grid: { display: false } }, y: { grid: { color: t.grid }, beginAtZero: true, ticks: { callback: v => compact(v) } } } } });
+      charts.forEach(c => c.destroy()); charts = [];
+      const t = chartTheme(); Chart.defaults.color = t.text;
+      currencyGroups.forEach((currency, i) => {
+        const series = d.series.filter(s => (s.currency || '—') === currency);
+        const names = [...new Set(series.map(s => s.name))];
+        const canvas = el.querySelector(`#revenue-currency-${i}`); if (!canvas) return;
+        charts.push(new Chart(canvas, { type: 'line', data: { labels: d.days.map(shortDay), datasets: (names.length ? names : ['No sales']).map((n, j) => ({ label: n, data: d.days.map(day => { const r = series.find(s => s.d === day && s.name === n); return r ? Number(r.revenue) : 0; }), borderColor: PALETTE[j % PALETTE.length], backgroundColor: PALETTE[j % PALETTE.length] + '22', fill: true, tension: .38, pointRadius: 0, borderWidth: 2.5 })) }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { usePointStyle: true } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fmtCurrency(c.raw, currency)}` } } }, scales: { x: { grid: { display: false } }, y: { grid: { color: t.grid }, beginAtZero: true, ticks: { callback: v => `${currency} ${compact(v)}` } } } } }));
+      });
     };
-    await load(); ctx.cleanup = () => chart && chart.destroy(); ['sale.new', 'order.new'].forEach(e => ctx.on(e, debounce(load, 800)));
+    await load(); ctx.cleanup = () => { charts.forEach(c => c.destroy()); charts = []; }; ['sale.new', 'order.new'].forEach(e => ctx.on(e, debounce(load, 800)));
   },
 
   async businesses(el, ctx) {
