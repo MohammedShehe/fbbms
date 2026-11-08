@@ -40,3 +40,11 @@ export const post = (p, body) => api(p, { method: 'POST', body: body || {} });
 export const put = (p, body) => api(p, { method: 'PUT', body: body || {} });
 export const del = p => api(p, { method: 'DELETE' });
 export const streamUrl = () => `${API_BASE}/b/stream?token=${encodeURIComponent(session.token)}&b=${session.biz}`;
+
+/** Authenticated file download (returns a Blob). */
+export async function downloadBlob(path, { params } = {}) {
+  const headers = {}; if (session.token) headers.Authorization = 'Bearer ' + session.token;
+  let res; try { res = await fetch(API_BASE + path + qs(params), { headers }); } catch { throw new ApiError('Cannot reach the server. Check your internet connection.', 0); }
+  if (!res.ok) { let m = 'Download failed'; try { m = (await res.json()).message || m; } catch (_) { /* ignore */ } throw new ApiError(m, res.status); }
+  return res.blob();
+}

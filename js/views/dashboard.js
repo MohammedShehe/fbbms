@@ -5,6 +5,9 @@ let charts = [];
 const kill = () => { charts.forEach(c => c.destroy()); charts = []; };
 
 export async function render(el, ctx) {
+  const home = ctx.biz && ctx.biz.settings && ctx.biz.settings.home; // business types open their own dashboard
+  if (home === 'barber' && ctx.biz.modules.barber) return (await import('./barber-dashboard.js')).render(el, ctx);
+  if (home === 'rentals' && ctx.biz.modules.rentals) return (await import('./rental-dashboard.js')).render(el, ctx);
   const g = greeting(ctx.profile.name);
   el.innerHTML = `<div class="hero"><div class="d-flex flex-wrap justify-content-between align-items-center gap-3"><div><h1>${esc(g.title)}</h1><p>${esc(g.sub)}</p></div>
     <div class="d-flex gap-2 flex-wrap">${ctx.can('sales.create') ? '<a class="btn btn-fb" href="#/pos"><i class="bi bi-bag-plus me-1"></i>New sale</a>' : ''}${ctx.can('products.manage') ? '<a class="btn btn-soft" href="#/products"><i class="bi bi-box-seam me-1"></i>Products</a>' : ''}</div></div></div>

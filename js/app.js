@@ -18,6 +18,20 @@ const NAV = [
   { id: 'refunds', label: 'Refunds & exchanges', icon: 'bi-arrow-return-left', mod: 'refunds', any: ['sales.refund', 'sales.view_all'] },
   { id: 'customers', label: 'Customers', icon: 'bi-people', mod: 'customers', any: ['customers.view', 'customers.manage', 'reports.view'] },
   { id: 'orders', label: 'Website orders', icon: 'bi-globe2', perm: 'orders.view', badge: true },
+  { group: 'Barber shop', mod: 'barber' },
+  { id: 'appointments', label: 'Queue & appointments', icon: 'bi-calendar2-check-fill', mod: 'barber', any: ['appointments.manage', 'services.manage', 'sales.create'] },
+  { id: 'services', label: 'Services & prices', icon: 'bi-scissors', mod: 'barber', any: ['services.manage', 'appointments.manage'] },
+  { id: 'barbers', label: 'Barbers & commissions', icon: 'bi-person-badge-fill', mod: 'barber', any: ['services.manage', 'commissions.view', 'reports.view'] },
+  { id: 'usage', label: 'Supplies used', icon: 'bi-droplet-half', mod: 'barber', any: ['appointments.manage', 'stock.adjust'] },
+  { id: 'barber-reports', label: 'Barber reports', icon: 'bi-bar-chart-line-fill', mod: 'barber', perm: 'reports.view' },
+  { group: 'Car rental', mod: 'rentals' },
+  { id: 'rental-calendar', label: 'Rental calendar', icon: 'bi-calendar3-range-fill', mod: 'rentals', any: ['bookings.manage', 'vehicles.manage', 'rental.payments'] },
+  { id: 'bookings', label: 'Bookings', icon: 'bi-journal-check', mod: 'rentals', any: ['bookings.manage', 'rental.payments'] },
+  { id: 'vehicles', label: 'Vehicles', icon: 'bi-car-front-fill', mod: 'rentals', any: ['vehicles.manage', 'bookings.manage'] },
+  { id: 'rental-customers', label: 'Rental customers', icon: 'bi-person-vcard-fill', mod: 'rentals', any: ['bookings.manage', 'rental.payments'] },
+  { id: 'rental-payments', label: 'Payments & balances', icon: 'bi-cash-coin', mod: 'rentals', any: ['rental.payments', 'reports.view'] },
+  { id: 'maintenance', label: 'Maintenance', icon: 'bi-wrench-adjustable-circle-fill', mod: 'rentals', any: ['maintenance.manage', 'vehicles.manage'] },
+  { id: 'rental-reports', label: 'Rental reports', icon: 'bi-graph-up', mod: 'rentals', any: ['reports.view', 'rental.payments'] },
   { group: 'Inventory' },
   { id: 'products', label: 'Products', icon: 'bi-box-seam-fill', any: ['products.view', 'products.manage'] },
   { id: 'stock', label: 'Stock ledger', icon: 'bi-clipboard2-data-fill', perm: 'stock.adjust' },
@@ -76,7 +90,8 @@ ctx.applyLanguage = function () {
 };
 
 const modOn = n => !n.mod || n.dev || !ctx.biz || (n.mod === '_group' ? !!ctx.biz.group_id : ctx.biz.modules ? ctx.biz.modules[n.mod] !== false : true);
-const allowed = n => n.group ? true : !modOn(n) ? false : n.dev ? ctx.isDev : n.superOnly ? ctx.isSuper : n.perm ? ctx.can(n.perm) : n.any ? ctx.canAny(n.any) : true;
+const hidden = n => !!(ctx.biz && n.id && ((ctx.biz.settings || {}).hide_nav || []).includes(n.id));
+const allowed = n => n.group ? true : !modOn(n) || hidden(n) ? false : n.dev ? ctx.isDev : n.superOnly ? ctx.isSuper : n.perm ? ctx.can(n.perm) : n.any ? ctx.canAny(n.any) : true;
 const needsBiz = id => !id.startsWith('dev-');
 
 /* ---------------- boot ---------------- */
@@ -177,7 +192,8 @@ function renderNav() {
   $('#nav').innerHTML = out.map(n => n.group ? `<div class="nav-group">${n.group}</div>` :
     `<a class="nav-item ${n.id === cur ? 'active' : ''}" href="#/${n.id}" data-id="${n.id}"><i class="bi ${n.icon}"></i><span>${n.label}</span>${n.badge && ctx.badge ? `<span class="badge-dot">${ctx.badge}</span>` : ''}${n.alerts && ctx.alerts ? `<span class="badge-dot">${ctx.alerts}</span>` : ''}</a>`).join('');
   // bottom nav (mobile): up to 4 main + menu
-  const main = out.filter(n => !n.group && !n.jump && ['dashboard', 'pos', 'sales', 'orders', 'products', 'dev-overview', 'dev-businesses'].includes(n.id)).slice(0, 4);
+  const mainIds = ctx.biz && ctx.biz.modules && ctx.biz.modules.barber && !(ctx.biz.settings.hide_nav || []).includes('pos') ? ['dashboard', 'appointments', 'pos', 'barbers'] : ctx.biz && ctx.biz.modules && ctx.biz.modules.rentals && (ctx.biz.settings.hide_nav || []).includes('pos') ? ['dashboard', 'rental-calendar', 'bookings', 'vehicles'] : ['dashboard', 'pos', 'sales', 'orders', 'products', 'dev-overview', 'dev-businesses'];
+  const main = mainIds.map(id => out.find(n => n.id === id)).filter(Boolean).slice(0, 4);
   $('#bottomNav').innerHTML = main.map(n => `<a href="#/${n.id}" class="${n.id === cur ? 'active' : ''}"><i class="bi ${n.icon}"></i>${n.label.split(' ')[0]}${n.badge && ctx.badge ? `<span class="badge-dot" style="position:absolute;top:2px;right:22%">${ctx.badge}</span>` : ''}</a>`).join('') + `<a href="#" id="bnMore"><i class="bi bi-grid-3x3-gap"></i>More</a>`;
   $('#bnMore').onclick = e => { e.preventDefault(); document.body.classList.add('nav-open'); };
 }
@@ -214,7 +230,7 @@ function openStream() {
   es = new EventSource(streamUrl());
   es.addEventListener('hello', () => setLive(true));
   es.onerror = () => setLive(false);
-  const evs = ['notification', 'sale.new', 'sale.voided', 'order.new', 'order.updated', 'product.changed', 'stock.low', 'expense.new', 'settings.changed', 'billing.changed', 'billing.prompt'];
+  const evs = ['notification', 'sale.new', 'sale.voided', 'order.new', 'order.updated', 'product.changed', 'stock.low', 'expense.new', 'appointment.changed', 'booking.changed', 'vehicle.changed', 'settings.changed', 'billing.changed', 'billing.prompt'];
   evs.forEach(ev => es.addEventListener(ev, m => { let d = {}; try { d = JSON.parse(m.data); } catch (_) {} onLive(ev, d); }));
 }
 function beep() { try { const a = new (window.AudioContext || window.webkitAudioContext)(); const o = a.createOscillator(), g = a.createGain(); o.connect(g); g.connect(a.destination); o.type = 'sine'; o.frequency.value = 880; g.gain.setValueAtTime(.001, a.currentTime); g.gain.exponentialRampToValueAtTime(.2, a.currentTime + .02); g.gain.exponentialRampToValueAtTime(.001, a.currentTime + .5); o.start(); o.stop(a.currentTime + .5); } catch (_) {} }

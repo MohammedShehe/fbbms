@@ -1,7 +1,7 @@
 import { get, post } from '../api.js';
 import { esc, money, fmtDate, openModal, fail, ok, empty, skeleton, confirmBox, todayEAT, addDays, debounce, downloadCSV, pill } from '../ui.js';
 
-const CATS = ['Rent', 'Salaries', 'Transport', 'Utilities', 'Marketing', 'Packaging', 'Restocking costs', 'Maintenance', 'Taxes & licences', 'Other'];
+const CATS = ['Rent', 'Salaries', 'Product purchases', 'Equipment purchases', 'Vehicle maintenance', 'Commissions paid', 'Transport', 'Utilities', 'Marketing', 'Packaging', 'Restocking costs', 'Maintenance', 'Taxes & licences', 'Other'];
 
 export async function render(el, ctx) {
   const st = { from: todayEAT().slice(0, 8) + '01', to: todayEAT(), q: '' };

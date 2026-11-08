@@ -15,7 +15,9 @@ export const debounce = (fn, ms = 300) => { let t; return (...a) => { clearTimeo
 let CUR = 'TZS';
 export const setCurrency = c => { CUR = c || 'TZS'; };
 export const num = n => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
-export const money = n => `${CUR} ${num(n)}`;
+const SYM = { MYR: 'RM' }; // shown the way people write it
+export const curLabel = c => SYM[c] || c;
+export const money = n => `${curLabel(CUR)} ${num(n)}`;
 export const compact = n => Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(n || 0));
 export const pct = (a, b) => b ? ((a - b) / b * 100) : (a > 0 ? 100 : 0);
 
@@ -88,7 +90,7 @@ export function confirmBox({ title = 'Are you sure?', message = '', confirmText 
 export const skeleton = (n = 4, h = 18) => Array.from({ length: n }, () => `<div class="skeleton mb-2" style="height:${h}px"></div>`).join('');
 export const empty = (icon, title, text = '') => `<div class="empty"><i class="bi ${icon}"></i><div class="fw-bold text-body">${esc(title)}</div><div>${esc(text)}</div></div>`;
 export const pill = (text, kind = '') => `<span class="pill ${kind}">${esc(text)}</span>`;
-export const PAY = { cash: ['Cash', 'bi-cash-coin'], mobile_money: ['Mobile money', 'bi-phone'], card: ['Card', 'bi-credit-card'], bank: ['Bank', 'bi-bank'], other: ['Other', 'bi-three-dots'] };
+export const PAY = { cash: ['Cash', 'bi-cash-coin'], mobile_money: ['Mobile money', 'bi-phone'], card: ['Card', 'bi-credit-card'], bank: ['Bank transfer', 'bi-bank'], qr: ['DuitNow QR', 'bi-qr-code'], ewallet: ['E-wallet', 'bi-wallet2'], other: ['Other', 'bi-three-dots'] };
 export const payLabel = k => (PAY[k] || [k])[0];
 export const ORDER_STATUS = { new: ['New', 'info'], contacted: ['Contacted', 'warning'], confirmed: ['Confirmed', 'gold'], completed: ['Completed', 'success'], cancelled: ['Cancelled', 'danger'] };
 export const statusPill = s => { const [t, k] = ORDER_STATUS[s] || [s, '']; return pill(t, k); };
